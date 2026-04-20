@@ -16,6 +16,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
+import media as md
 
 from core.iot_analysis      import generer_rapport_iot, load_and_preprocess
 from core.scoring           import (
@@ -38,7 +39,7 @@ from models.reservation     import Reservation, DUREE_VERROU_MINUTES
 st.set_page_config(
     page_title="OptiStock Solutions",
     layout="wide",
-    page_icon="🏭",
+    page_icon="media\warehouse-storage-unit-storehouse-svgrepo-com.svg",
     initial_sidebar_state="expanded"
 )
 
@@ -63,7 +64,8 @@ st.markdown("""
 # ═════════════════════════════════════════════════════════════════════════════
 
 def render_search_page() -> None:
-    st.title("🏭 Recherche d'Entrepôts & Audit IoT")
+    st.image("media\warehouse-storage-unit-storehouse-svgrepo-com.svg", width=60)
+    st.title("Recherche d'Entrepôts & Audit IoT")
     st.caption("Recherche d'entrepôts basée sur l'historique capteurs.")
 
     with st.expander("Voir le processus de calcul logistique", expanded=False):
@@ -372,7 +374,7 @@ def render_decision_finale_page() -> None:
 # ═════════════════════════════════════════════════════════════════════════════
 
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3256/3256860.png", width=60)
+    st.image("media/livraison.png", width=60)
     st.title("OptiStock")
     st.markdown("---")
     vue = st.radio("Navigation", ["🔍 Recherche IoT", "🌍 Analyse Environnementale", "⚖️ Décision (Phase 4)"])

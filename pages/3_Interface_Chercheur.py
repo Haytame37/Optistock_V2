@@ -109,28 +109,28 @@ with tab1:
     
     # --- SECTION 1 : IMPORTATION ---
     st.subheader("1. Importation des fichiers")
-    col1, col2, col3 = st.columns(3)
+    
     
     df_entrepots = handle_upload(
         "Catalogue des Entrepôts (CSV)", 
         ['id_entrepot', 'id_proprietaire', 'nom', 'latitude', 'longitude', 'type_stockage', 'volume'],
         ['id_entrepot', 'id_proprietaire', 'nom', 'latitude', 'longitude', 'type_stockage', 'volume (m³)'],
         ['ENT001', 'OWN001', 'Hub_Casa', '33.61', '-7.55', 'froid', '12000'],
-        col=col1
+        
     )
     df_temp = handle_upload(
         "Historique Température IoT (CSV)", 
         ['id', 'id_entrepot', 'datetime', 'capteur1', 'capteur2', 'capteur3'],
         ['id', 'id_entrepot', 'datetime', 'T_C1', 'T_C2', 'T_C3'],
         ['TMP-ENT001-001', 'ENT001', '2025-01-01 08:00', '4.2', '4.5', '4.1'],
-        col=col2
+       
     )
     df_humid = handle_upload(
         "Historique Humidité IoT (CSV)", 
         ['id', 'id_entrepot', 'id_proprietaire', 'datetime', 'capteur1', 'capteur2', 'capteur3'],
         ['id', 'id_entrepot', 'id_proprietaire', 'datetime', 'H_C1', 'H_C2', 'H_C3'],
         ['HUM-ENT001-001', 'ENT001', 'OWN001', '2025-01-01 08:00', '72.5', '71.5', '73.0'],
-        col=col3
+        
     )
     df_trajets = handle_upload(
         "Trajets logistiques de tous les clients (CSV)", 
