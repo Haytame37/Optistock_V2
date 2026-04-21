@@ -64,7 +64,7 @@ st.markdown("""
 # ═════════════════════════════════════════════════════════════════════════════
 
 def render_search_page() -> None:
-    st.image("media\warehouse-storage-unit-storehouse-svgrepo-com.svg", width=60)
+    st.image("media/warehouse_logo.svg", width=60)
     st.title("Recherche d'Entrepôts & Audit IoT")
     st.caption("Recherche d'entrepôts basée sur l'historique capteurs.")
 
