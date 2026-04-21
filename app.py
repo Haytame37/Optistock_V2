@@ -39,7 +39,7 @@ from models.reservation     import Reservation, DUREE_VERROU_MINUTES
 st.set_page_config(
     page_title="OptiStock Solutions",
     layout="wide",
-    page_icon="media\warehouse-storage-unit-storehouse-svgrepo-com.svg",
+    page_icon="media/warehouse_logo.svg",
     initial_sidebar_state="expanded"
 )
 
