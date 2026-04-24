@@ -20,7 +20,7 @@ from typing import Optional
 
 from utils.db import execute_query, load_sql_to_dataframe
 
-DUREE_VERROU_MINUTES: int = 15
+DUREE_VERROU_MINUTES: int = 120
 
 STATUS_AVAILABLE = "available"
 STATUS_PRE_LOCK  = "pre_lock"
