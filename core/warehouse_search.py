@@ -118,46 +118,38 @@ def _incident_penalty(mask: pd.Series, weight: float) -> tuple[float, int]:
     return penalty, count
 
 
-def _load_sensor_file(path: Path) -> pd.DataFrame:
-    df = pd.read_csv(path)
-    required_columns = {"datetime", "capteur1", "capteur2", "capteur3"}
-    missing = required_columns - set(df.columns)
-    if missing:
-        raise ValueError(f"Colonnes manquantes dans {path.name}: {', '.join(sorted(missing))}")
-
-    df = df.copy()
-    df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
-    df = df.dropna(subset=["datetime"]).sort_values("datetime").reset_index(drop=True)
-    return df
-
+from utils.db import load_sql_to_dataframe
 
 def calculate_entrepot_score(
     entrepot_id: str,
     type_recherche: str,
-    data_dir: str | Path,
+    data_dir: str | Path = None,
 ) -> dict:
-    data_path = Path(data_dir)
-    temp_path = data_path / f"temperature_{entrepot_id}.csv"
-    humid_path = data_path / f"humidite_{entrepot_id}.csv"
-
-    if not temp_path.exists() or not humid_path.exists():
-        raise FileNotFoundError(f"Fichiers capteurs introuvables pour {entrepot_id}")
-
     params = TYPE_PARAMS.get(type_recherche.upper(), TYPE_PARAMS["STANDARD"])
 
-    df_temp = _load_sensor_file(temp_path)
-    df_hum = _load_sensor_file(humid_path)
+    query = f"""
+        SELECT 
+            recorded_at as datetime, 
+            temp_sensor_1 as capteur1_t, 
+            temp_sensor_2 as capteur2_t, 
+            temp_sensor_3 as capteur3_t, 
+            hum_sensor_1 as capteur1_h, 
+            hum_sensor_2 as capteur2_h, 
+            hum_sensor_3 as capteur3_h 
+        FROM iot_readings 
+        WHERE warehouse_id = '{entrepot_id}' 
+        ORDER BY recorded_at
+    """
+    merged = load_sql_to_dataframe(query)
 
-    merged = pd.merge(
-        df_temp[["datetime", "capteur1", "capteur2", "capteur3"]],
-        df_hum[["datetime", "capteur1", "capteur2", "capteur3"]],
-        on="datetime",
-        how="inner",
-        suffixes=("_t", "_h"),
-    )
+    if merged is None or merged.empty:
+        raise ValueError(f"Aucune donnée IoT pour {entrepot_id}")
+
+    merged["datetime"] = pd.to_datetime(merged["datetime"], errors="coerce")
+    merged = merged.dropna(subset=["datetime"]).sort_values("datetime").reset_index(drop=True)
 
     if merged.empty:
-        raise ValueError(f"Aucune plage horaire commune entre temperature et humidite pour {entrepot_id}")
+        raise ValueError(f"Aucune plage horaire valide pour {entrepot_id}")
 
     merged["T_heure"] = merged[["capteur1_t", "capteur2_t", "capteur3_t"]].median(axis=1)
     merged["H_heure"] = merged[["capteur1_h", "capteur2_h", "capteur3_h"]].median(axis=1)
@@ -255,17 +247,16 @@ def calculate_entrepot_score(
     }
 
 
-def search_entrepots(type_recherche: str, data_dir: str | Path) -> list[dict]:
-    data_path = Path(data_dir)
-    entrepot_ids = sorted(
-        path.stem.replace("temperature_", "")
-        for path in data_path.glob("temperature_ENT*.csv")
-    )
+def search_entrepots(type_recherche: str, data_dir: str | Path = None) -> list[dict]:
+    df_wh = load_sql_to_dataframe("SELECT DISTINCT warehouse_id FROM iot_readings")
+    if df_wh is None or df_wh.empty:
+        return []
+    entrepot_ids = sorted(df_wh["warehouse_id"].tolist())
 
     results = []
     for entrepot_id in entrepot_ids:
         try:
-            results.append(calculate_entrepot_score(entrepot_id, type_recherche, data_path))
+            results.append(calculate_entrepot_score(entrepot_id, type_recherche))
         except Exception:
             continue
 

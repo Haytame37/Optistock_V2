@@ -91,8 +91,7 @@ def render_search_page() -> None:
             st.session_state["do_search"] = True
 
     if st.session_state.get("do_search", False):
-        data_dir = Path(__file__).parent / "data" / "cleaned"
-        results = search_entrepots(type_recherche, data_dir)
+        results = search_entrepots(type_recherche)
 
         if not results:
             st.warning("Aucun entrepôt trouvé avec les critères actuels.")
@@ -138,12 +137,17 @@ def render_environmental_page() -> None:
 
     # Chargement robuste des données (via SQL avec fallback simulé)
     try:
-        df_t_raw = load_sql_to_dataframe("SELECT * FROM temperature")
-        df_h_raw = load_sql_to_dataframe("SELECT * FROM humidite")
+        df_iot = load_sql_to_dataframe("SELECT * FROM iot_readings")
 
-        if df_t_raw.empty or df_h_raw.empty:
-            raise ValueError("Tables IoT vides.")
+        if df_iot is None or df_iot.empty:
+            raise ValueError("Table iot_readings vide.")
             
+        # Reconstruct old format for UI compatibility
+        df_t_raw = df_iot[['warehouse_id', 'recorded_at', 'temp_sensor_1', 'temp_sensor_2', 'temp_sensor_3']].copy()
+        df_t_raw.columns = ['id_entrepot', 'datetime', 'capteur1', 'capteur2', 'capteur3']
+        df_h_raw = df_iot[['warehouse_id', 'recorded_at', 'hum_sensor_1', 'hum_sensor_2', 'hum_sensor_3']].copy()
+        df_h_raw.columns = ['id_entrepot', 'datetime', 'capteur1', 'capteur2', 'capteur3']
+        
         df_t_raw["datetime"] = pd.to_datetime(df_t_raw["datetime"])
         df_h_raw["datetime"] = pd.to_datetime(df_h_raw["datetime"])
     except Exception:
@@ -350,20 +354,20 @@ def render_decision_finale_page() -> None:
         verrous = Reservation.get_verrous_actifs()
         if verrous:
             for eid, v in verrous.items():
-                st.code(f"[{v['statut']}] {eid} > Expire à {v['expiration'].strftime('%H:%M:%S')}")
+                st.code(f"[{v['status']}] {eid} > Expire à {v['expires_at'].strftime('%H:%M:%S')}")
         else:
             st.success("Aucun entrepôt n'est actuellement en phase de négociation exclusive.")
 
     # Logique boutons
     if btn_lock:
-        resa = Reservation(id_reservation="RES001", entrepot_id=e_id, client_id="CLIENT_WEB", score_global=score_global)
+        resa = Reservation(reservation_id="RES001", warehouse_id=e_id, researcher_id=2, global_score=score_global)
         res = resa.appliquer_verrou(e_id)
         if res["succes"]: st.success(res["message"])
         else: st.error(res["message"])
         st.rerun()
 
     if btn_unlock:
-        tmp = Reservation("TMP", e_id, "TMP")
+        tmp = Reservation("TMP", e_id, 2)
         msg = tmp.liberer_verrou(e_id)
         st.toast(msg["message"])
         st.rerun()

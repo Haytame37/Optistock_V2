@@ -4,9 +4,8 @@ import os
 DB_PATH = os.path.join(os.path.dirname(__file__), "optistock.db")
 
 def create_database():
-    """Crée ou réinitialise la base de données avec le nouveau schéma."""
+    """Crée ou réinitialise la base de données avec le nouveau schéma EARSER."""
     
-    # Supprimer la base existante pour repartir de zéro (Optionnel, mais utile en dev)
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
         print("🔄 Ancienne base de données supprimée.")
@@ -14,58 +13,97 @@ def create_database():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Pour s'assurer que les contraintes de clés étrangères sont respectées
+    # Activer les contraintes de clés étrangères
     cursor.execute("PRAGMA foreign_keys = ON;")
 
-    # Table Catalogue Entrepot (Strictement basé sur vos colonnes + les nôtres avec des defauts)
+    # 1. Table users
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS entrepots (
-            id_entrepot TEXT PRIMARY KEY,
-            id_proprietaire TEXT NOT NULL,
-            nom TEXT DEFAULT 'Entrepôt Sans Nom',
-            latitude REAL NOT NULL,
-            longitude REAL NOT NULL,
-            type_stockage TEXT DEFAULT 'mixte',
-            volume INTEGER DEFAULT 10000
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT NOT NULL CHECK(role IN ('admin', 'researcher', 'owner')),
+            username TEXT UNIQUE NOT NULL,
+            first_name TEXT,
+            last_name TEXT,
+            email TEXT UNIQUE,
+            password_hash TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # Table Température (Aura l'identifiant id_proprietaire pour symétrie si voulu, mais vous avez spécifié sans donc on s'aligne : id, id_entrepot, datetime, capteur 1,2,3)
+    # 2. Table warehouses
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS temperature (
-            id TEXT PRIMARY KEY,
-            id_entrepot TEXT NOT NULL,
-            datetime DATETIME NOT NULL,
-            capteur1 REAL,
-            capteur2 REAL,
-            capteur3 REAL,
-            FOREIGN KEY (id_entrepot) REFERENCES entrepots(id_entrepot) ON DELETE CASCADE
+        CREATE TABLE IF NOT EXISTS warehouses (
+            warehouse_id TEXT PRIMARY KEY,
+            owner_id INTEGER,
+            name TEXT,
+            volume_m3 REAL,
+            latitude REAL,
+            longitude REAL,
+            status TEXT DEFAULT 'available' CHECK(status IN ('available', 'unavailable', 'locked')),
+            locked_at DATETIME,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE SET NULL
         )
     ''')
 
-    # Table Humidité (Exemple avec id_proprietaire : id, id_entrepot, id_proprietaire, datetime, capteur1, capteur2, capteur3)
+    # 3. Table delivery_points
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS humidite (
-            id TEXT PRIMARY KEY,
-            id_entrepot TEXT NOT NULL,
-            id_proprietaire TEXT,
-            datetime DATETIME NOT NULL,
-            capteur1 REAL,
-            capteur2 REAL,
-            capteur3 REAL,
-            FOREIGN KEY (id_entrepot) REFERENCES entrepots(id_entrepot) ON DELETE CASCADE
+        CREATE TABLE IF NOT EXISTS delivery_points (
+            request_id TEXT PRIMARY KEY,
+            researcher_id INTEGER,
+            name TEXT,
+            product_type TEXT,
+            latitude REAL,
+            longitude REAL,
+            FOREIGN KEY (researcher_id) REFERENCES users(user_id) ON DELETE CASCADE
         )
     ''')
 
-    # Créer des index pour accélérer les requêtes
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_temp_entrepot ON temperature(id_entrepot);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_hum_entrepot ON humidite(id_entrepot);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_temp_date ON temperature(datetime);")
+    # 4. Table reservations
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS reservations (
+            reservation_id TEXT PRIMARY KEY,
+            warehouse_id TEXT,
+            researcher_id INTEGER,
+            global_score REAL,
+            status TEXT DEFAULT 'pending' CHECK(status IN ('pre_lock', 'pending', 'confirmed', 'canceled')),
+            reason TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME,
+            FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id) ON DELETE CASCADE,
+            FOREIGN KEY (researcher_id) REFERENCES users(user_id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 5. Table iot_readings
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS iot_readings (
+            reading_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            warehouse_id TEXT NOT NULL,
+            recorded_at DATETIME NOT NULL,
+            temp_sensor_1 REAL,
+            temp_sensor_2 REAL,
+            temp_sensor_3 REAL,
+            hum_sensor_1 REAL,
+            hum_sensor_2 REAL,
+            hum_sensor_3 REAL,
+            FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Création d'index pour optimiser les jointures et recherches temporelles
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_iot_warehouse ON iot_readings(warehouse_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_iot_recorded_at ON iot_readings(recorded_at);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_res_warehouse ON reservations(warehouse_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_wh_status ON warehouses(status);")
 
     conn.commit()
     conn.close()
     
-    print(f"✅ Base de données SQLite créée avec succès : {DB_PATH}")
+    print(f"✅ Base de données SQLite (Schéma EARSER) créée avec succès : {DB_PATH}")
 
 if __name__ == "__main__":
     create_database()
