@@ -2,6 +2,7 @@ import pandas as pd
 import sqlite3
 import os
 import glob
+import bcrypt
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "optistock.db")
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "samples")
@@ -18,11 +19,19 @@ def seed_database():
     cursor = conn.cursor()
 
     # 1. Création d'utilisateurs par défaut pour satisfaire les contraintes de clés étrangères
-    print("👤 Création des utilisateurs par défaut (admin et researcher)...")
-    cursor.execute("""
-        INSERT OR IGNORE INTO users (user_id, role, username, first_name, last_name, email)
-        VALUES (1, 'owner', 'default_owner', 'Admin', 'Global', 'admin@optistock.com'),
-               (2, 'researcher', 'default_researcher', 'Chercheur', 'Principal', 'researcher@optistock.com')
+    print("👤 Création des 5 utilisateurs par défaut (1 admin, 2 owners, 2 researchers)...")
+    
+    password = "password123".encode('utf-8')
+    hashed_pw = bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8')
+    
+    cursor.execute(f"""
+        INSERT OR IGNORE INTO users (user_id, role, first_name, last_name, email, password_hash)
+        VALUES 
+            (1, 'admin', 'Admin', 'Principal', 'admin@optistock.com', '{hashed_pw}'),
+            (2, 'owner', 'Propriétaire', 'Un', 'owner1@optistock.com', '{hashed_pw}'),
+            (3, 'owner', 'Propriétaire', 'Deux', 'owner2@optistock.com', '{hashed_pw}'),
+            (4, 'researcher', 'Chercheur', 'Alpha', 'researcher1@optistock.com', '{hashed_pw}'),
+            (5, 'researcher', 'Chercheur', 'Beta', 'researcher2@optistock.com', '{hashed_pw}')
     """)
     
     # 2. Importation du Catalogue Entrepôts (entrepots.csv -> warehouses)
@@ -35,7 +44,8 @@ def seed_database():
         # Colonnes attendues: warehouse_id, owner_id, name, volume_m3, latitude, longitude, status
         df_wh = pd.DataFrame()
         df_wh["warehouse_id"] = df_entrepots["id_entrepot"]
-        df_wh["owner_id"] = 1  # Attribuer au propriétaire par défaut
+        # Assigner de manière aléatoire aux owner 2 et 3
+        df_wh["owner_id"] = [2 if i % 2 == 0 else 3 for i in range(len(df_entrepots))]
         df_wh["name"] = "Entrepôt " + df_entrepots["id_entrepot"]
         df_wh["volume_m3"] = 10000.0  # Valeur par défaut
         df_wh["latitude"] = df_entrepots["latitude"]

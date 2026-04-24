@@ -21,12 +21,11 @@ def create_database():
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY AUTOINCREMENT,
             role TEXT NOT NULL CHECK(role IN ('admin', 'researcher', 'owner')),
-            username TEXT UNIQUE NOT NULL,
-            first_name TEXT,
-            last_name TEXT,
-            email TEXT UNIQUE,
-            password_hash TEXT,
-            is_active INTEGER DEFAULT 1,
+            first_name TEXT NOT NULL,
+            last_name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1 CHECK(is_active IN (0, 1)),
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )

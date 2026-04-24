@@ -1,6 +1,20 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from utils.db import load_sql_to_dataframe
+
+st.set_page_config(page_title="Interface Chercheur", page_icon="🧪", layout="wide")
+
+if "user_id" not in st.session_state or st.session_state.get("role") not in ["researcher", "admin"]:
+    st.warning("Veuillez vous connecter en tant que chercheur pour accéder à cette page.")
+    st.stop()
+
+col1, col2 = st.columns([8, 2])
+with col2:
+    if st.button("🚪 Se déconnecter", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
 
 from core.logistique import (
     haversine, calculer_score_mixte, analyser_demandes_et_localiser,
@@ -68,6 +82,9 @@ def handle_upload(label, required_columns, display_columns=None, example_row=Non
             return None
     return None
 
+import uuid
+from utils.db import execute_query
+
 # ═══════════════════════════════════════════════════════════════════
 #  EN-TÊTE
 # ═══════════════════════════════════════════════════════════════════
@@ -89,7 +106,43 @@ st.markdown("""
 <hr style="border: 0; height: 1px; background: #E2E8F0; margin-bottom: 25px;">
 """, unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["Module 1 : Recommandation Intelligente", "Module 2 : Optimisation de l'Emplacement"])
+tab_db, tab1, tab2 = st.tabs(["📦 Gestion des Projets (Base de Données)", "Module 1 : Recommandation Intelligente", "Module 2 : Optimisation de l'Emplacement"])
+
+# Assume login sets session_state
+researcher_id = st.session_state["user_id"]
+
+with tab_db:
+    st.markdown("### 🎯 Mes Points de Livraison")
+    st.write("Gérez ici la liste de vos clients ou projets. Ces données alimentent automatiquement les modules d'optimisation.")
+    
+    df_dp_db = load_sql_to_dataframe(f"SELECT request_id, name, product_type, latitude, longitude FROM delivery_points WHERE researcher_id = {researcher_id}")
+    
+    if not df_dp_db.empty:
+        st.dataframe(df_dp_db, use_container_width=True, hide_index=True)
+    else:
+        st.info("Aucun point de livraison n'est enregistré dans la base de données pour votre compte.")
+        
+    with st.expander("📥 Importer une liste (CSV)"):
+        st.caption("Le fichier doit contenir les colonnes : request_id, name, latitude, longitude, product_type")
+        uploaded_file = st.file_uploader("Fichier CSV", type=["csv"], key="upload_db_dp")
+        if uploaded_file is not None:
+            if st.button("Sauvegarder dans la base de données", type="primary"):
+                try:
+                    df_upload = pd.read_csv(uploaded_file)
+                    req_cols = ['request_id', 'name', 'latitude', 'longitude', 'product_type']
+                    if all(c in df_upload.columns for c in req_cols):
+                        from utils.db import execute_query
+                        for _, row in df_upload.iterrows():
+                            execute_query(
+                                "INSERT OR REPLACE INTO delivery_points (request_id, researcher_id, name, product_type, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)",
+                                (row['request_id'], researcher_id, row['name'], row['product_type'], row['latitude'], row['longitude'])
+                            )
+                        st.success(f"✅ {len(df_upload)} points de livraison enregistrés avec succès !")
+                        st.rerun()
+                    else:
+                        st.error(f"Le fichier doit contenir exactement les colonnes : {', '.join(req_cols)}")
+                except Exception as e:
+                    st.error(f"Erreur d'importation : {e}")
 
 # ═══════════════════════════════════════════════════════════════════
 #  MODULE 1 : RECOMMANDATION INTELLIGENTE (Multi-clients, Multi-entrepôts)
@@ -107,38 +160,31 @@ with tab1:
     
     st.write("Analysez **tous les clients** et trouvez les meilleurs entrepôts du catalogue pour chaque zone géographique.")
     
-    # --- SECTION 1 : IMPORTATION ---
-    st.subheader("1. Importation des fichiers")
+    # --- SECTION 1 : DONNÉES ---
+    st.subheader("1. Importation des données")
     
+    # Récupération automatique des entrepôts et données IoT depuis la base de données
+    st.info("📡 Chargement des catalogues d'entrepôts et historiques IoT directement depuis la base de données...")
     
-    df_entrepots = handle_upload(
-        "Catalogue des Entrepôts (CSV)", 
-        ['id_entrepot', 'id_proprietaire', 'nom', 'latitude', 'longitude', 'type_stockage', 'volume'],
-        ['id_entrepot', 'id_proprietaire', 'nom', 'latitude', 'longitude', 'type_stockage', 'volume (m³)'],
-        ['ENT001', 'OWN001', 'Hub_Casa', '33.61', '-7.55', 'froid', '12000'],
+    df_entrepots = load_sql_to_dataframe("SELECT warehouse_id AS id_entrepot, owner_id AS id_proprietaire, name AS nom, latitude, longitude, 'mixte' AS type_stockage, volume_m3 AS volume FROM warehouses")
+    df_temp = load_sql_to_dataframe("SELECT reading_id AS id, warehouse_id AS id_entrepot, recorded_at AS datetime, temp_sensor_1 AS capteur1, temp_sensor_2 AS capteur2, temp_sensor_3 AS capteur3 FROM iot_readings")
+    df_humid = load_sql_to_dataframe("SELECT r.reading_id AS id, r.warehouse_id AS id_entrepot, w.owner_id AS id_proprietaire, r.recorded_at AS datetime, r.hum_sensor_1 AS capteur1, r.hum_sensor_2 AS capteur2, r.hum_sensor_3 AS capteur3 FROM iot_readings r JOIN warehouses w ON r.warehouse_id = w.warehouse_id")
+    
+    # Utilisation des points de livraison de la base de données
+    if not df_dp_db.empty:
+        df_trajets = df_dp_db.copy()
+        # Renommage interne pour compatibilité avec l'algorithme logistique existant
+        df_trajets = df_trajets.rename(columns={
+            'request_id': 'client_id',
+            'latitude': 'lat',
+            'longitude': 'lon',
+            'product_type': 'type_requis'
+        })
+    else:
+        df_trajets = None
+        st.warning("⚠️ Vous n'avez aucun point de livraison. Veuillez en importer depuis l'onglet 'Gestion des Projets'.")
         
-    )
-    df_temp = handle_upload(
-        "Historique Température IoT (CSV)", 
-        ['id', 'id_entrepot', 'datetime', 'capteur1', 'capteur2', 'capteur3'],
-        ['id', 'id_entrepot', 'datetime', 'T_C1', 'T_C2', 'T_C3'],
-        ['TMP-ENT001-001', 'ENT001', '2025-01-01 08:00', '4.2', '4.5', '4.1'],
-       
-    )
-    df_humid = handle_upload(
-        "Historique Humidité IoT (CSV)", 
-        ['id', 'id_entrepot', 'id_proprietaire', 'datetime', 'capteur1', 'capteur2', 'capteur3'],
-        ['id', 'id_entrepot', 'id_proprietaire', 'datetime', 'H_C1', 'H_C2', 'H_C3'],
-        ['HUM-ENT001-001', 'ENT001', 'OWN001', '2025-01-01 08:00', '72.5', '71.5', '73.0'],
-        
-    )
-    df_trajets = handle_upload(
-        "Trajets logistiques de tous les clients (CSV)", 
-        ['client_id', 'lat', 'lon', 'type_requis'],
-        ['client_id', 'lat', 'lon', 'type_requis'],
-        ['C0001', '33.58', '-7.62', 'froid'],
-    )
-    
+    st.divider()
     # --- SECTION 2 : PARAMÉTRAGE ---
     st.subheader("2. Paramétrage")
     
@@ -168,7 +214,7 @@ with tab1:
     
     # --- SECTION 3 : ANALYSE ---
     if st.button("🚀 Lancer l'Analyse Complète", type="primary"):
-        if df_entrepots is not None and df_temp is not None and df_humid is not None and df_trajets is not None:
+        if not df_entrepots.empty and df_trajets is not None:
             with st.spinner('Analyse en cours sur tous les clients...'):
                 
                 # ── Pré-calcul IoT ──
@@ -304,7 +350,7 @@ with tab1:
                 afficher_carte_recommandation_multi(df_trajets_z, recommendations_par_zone, df_entrepots)
                 
         else:
-            st.error("Veuillez importer les 3 fichiers requis.")
+            st.error("Veuillez importer des points de livraison dans la base de données.")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -322,15 +368,23 @@ with tab2:
     
     st.markdown("Trouvez **un ou plusieurs** centres de gravité logistiques optimaux pour vos clients.")
     
-    df_demande = handle_upload(
-        "Fichier des points de demande", 
-        ['ville', 'lat', 'lon', 'demande', 'tarif_transport'], 
-        ['ville', 'lat', 'lon', 'demande', 'tarif_transport (Dhs/km)'],
-        ['Casablanca', '33.57', '-7.58', '1500', '1.2'],
-        col=st, 
-        key="upload_demande"
-    )
-    
+    if not df_dp_db.empty:
+        df_demande = df_dp_db.copy()
+        # Renommage interne et ajout des colonnes manquantes pour compatibilité
+        df_demande = df_demande.rename(columns={
+            'name': 'ville',
+            'latitude': 'lat',
+            'longitude': 'lon'
+        })
+        # Le modèle itératif de Weber requiert 'demande' et 'tarif_transport'
+        df_demande['demande'] = 1000.0
+        df_demande['tarif_transport'] = 1.2
+        
+        st.divider()
+    else:
+        df_demande = None
+        st.warning("⚠️ Vous n'avez aucun point de livraison. Veuillez en importer depuis l'onglet 'Gestion des Projets'.")
+        
     n_entrepots_loc = st.number_input(
         "Nombre d'entrepôts à implanter :", 
         min_value=1, max_value=5, value=1, step=1,

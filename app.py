@@ -381,86 +381,6 @@ def render_decision_finale_page() -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  NOUVELLES INTERFACES CRUD (Modèle EARSER)
-# ═════════════════════════════════════════════════════════════════════════════
-
-def render_users_page() -> None:
-    st.title("👥 Gestion des Utilisateurs")
-    st.caption("Visualisez les chercheurs, administrateurs et propriétaires d'entrepôts.")
-    
-    df_users = load_sql_to_dataframe("SELECT user_id, role, username, first_name, last_name, email, is_active, created_at FROM users")
-    if not df_users.empty:
-        st.dataframe(df_users, use_container_width=True, hide_index=True)
-    else:
-        st.info("Aucun utilisateur trouvé.")
-
-def render_warehouses_page() -> None:
-    st.title("🏢 Catalogue des Entrepôts")
-    st.caption("Vue d'ensemble des entrepôts et de leur statut de disponibilité.")
-    
-    df_wh = load_sql_to_dataframe("SELECT warehouse_id, name, volume_m3, latitude, longitude, status, updated_at FROM warehouses")
-    
-    if not df_wh.empty:
-        if "latitude" in df_wh.columns and "longitude" in df_wh.columns:
-            st.map(df_wh[["latitude", "longitude"]])
-        st.dataframe(df_wh, use_container_width=True, hide_index=True)
-    else:
-        st.info("Aucun entrepôt trouvé dans le catalogue.")
-
-def render_delivery_points_page() -> None:
-    st.title("🎯 Points de Livraison")
-    st.caption("Gérez les points de demande de livraison des chercheurs.")
-    
-    df_dp = load_sql_to_dataframe("SELECT request_id, researcher_id, name, product_type, latitude, longitude FROM delivery_points")
-    if not df_dp.empty:
-        st.map(df_dp[["latitude", "longitude"]])
-        st.dataframe(df_dp, use_container_width=True, hide_index=True)
-    else:
-        st.info("Aucun point de livraison actuellement enregistré.")
-
-def render_reservations_page() -> None:
-    st.title("📝 Suivi des Réservations")
-    st.caption("Gérez le cycle de vie complet des réservations.")
-    
-    # Nettoyage automatique des verrous
-    Reservation._purger_verrous_expires_cls()
-    
-    df_res = load_sql_to_dataframe("SELECT reservation_id, warehouse_id, researcher_id, status, global_score, reason, created_at, expires_at FROM reservations ORDER BY created_at DESC")
-    if not df_res.empty:
-        st.dataframe(df_res, use_container_width=True, hide_index=True)
-    else:
-        st.info("Aucune réservation trouvée.")
-        
-    st.divider()
-    st.subheader("⚙️ Actions Administratives")
-    col1, col2 = st.columns(2)
-    with col1:
-        res_id = st.text_input("ID Réservation à modifier")
-        action = st.selectbox("Nouvelle Action", ["Confirmer", "Annuler"])
-    with col2:
-        st.write("") # padding
-        st.write("")
-        if st.button("Appliquer la modification", type="primary"):
-            if res_id:
-                new_status = "confirmed" if action == "Confirmer" else "canceled"
-                execute_query(f"UPDATE reservations SET status = '{new_status}', reason = 'Action administrative' WHERE reservation_id = '{res_id}'")
-                
-                # Update warehouse status based on reservation status
-                df_target = load_sql_to_dataframe(f"SELECT warehouse_id FROM reservations WHERE reservation_id = '{res_id}'")
-                if not df_target.empty:
-                    w_id = df_target.iloc[0]["warehouse_id"]
-                    if new_status == "confirmed":
-                        execute_query(f"UPDATE warehouses SET status = 'unavailable' WHERE warehouse_id = '{w_id}'")
-                    else:
-                        execute_query(f"UPDATE warehouses SET status = 'available' WHERE warehouse_id = '{w_id}'")
-                
-                st.success(f"La réservation {res_id} a été mise à jour vers '{new_status}'.")
-                st.rerun()
-            else:
-                st.error("Veuillez saisir un ID de réservation.")
-
-
-# ═════════════════════════════════════════════════════════════════════════════
 #  ROUTAGE DU MENU
 # ═════════════════════════════════════════════════════════════════════════════
 
@@ -468,28 +388,11 @@ with st.sidebar:
     st.image("media/livraison.png", width=60)
     st.title("OptiStock")
     st.markdown("---")
-    pages = [
-        "🔍 Recherche IoT", 
-        "🌍 Analyse Environnementale", 
-        "⚖️ Décision (Phase 4)",
-        "🏢 Catalogue des Entrepôts",
-        "👥 Gestion des Utilisateurs",
-        "🎯 Points de Livraison",
-        "📝 Suivi des Réservations"
-    ]
-    vue = st.radio("Navigation", pages)
+    vue = st.radio("Navigation", ["🔍 Recherche IoT", "🌍 Analyse Environnementale", "⚖️ Décision (Phase 4)"])
 
 if vue == "🔍 Recherche IoT":
     render_search_page()
 elif vue == "🌍 Analyse Environnementale":
     render_environmental_page()
-elif vue == "⚖️ Décision (Phase 4)":
+else:
     render_decision_finale_page()
-elif vue == "🏢 Catalogue des Entrepôts":
-    render_warehouses_page()
-elif vue == "👥 Gestion des Utilisateurs":
-    render_users_page()
-elif vue == "🎯 Points de Livraison":
-    render_delivery_points_page()
-elif vue == "📝 Suivi des Réservations":
-    render_reservations_page()
