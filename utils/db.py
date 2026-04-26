@@ -7,6 +7,7 @@ DB_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)
 def get_db_connection():
     """Crée et retourne une connexion à la base de données SQLite."""
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
     # Permet d'accéder aux colonnes via leur nom au lieu d'un index
     conn.row_factory = sqlite3.Row 
     return conn

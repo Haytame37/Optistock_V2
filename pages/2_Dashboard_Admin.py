@@ -1,9 +1,9 @@
 import streamlit as st
-import bcrypt
 import uuid
 import pandas as pd
 from utils.db import load_sql_to_dataframe, execute_query, get_db_connection
 from models.reservation import Reservation
+from core.auth import hash_password
 
 # =====================================================
 # Configuration de la page
@@ -22,13 +22,9 @@ if 'logged_in' not in st.session_state or not st.session_state.get('logged_in'):
     st.switch_page("pages/1_Login.py")
     st.stop()
 
-
-
 if st.session_state.get('role') != "admin":
     st.error(f"🔒 Accès réservé aux administrateurs. Votre rôle : {st.session_state.get('role')}")
     st.stop()
-
-
 
 # =====================================================
 # CSS Personnalisé (Premium Design)
@@ -78,7 +74,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
 # =====================================================
 # Header & Navigation
 # =====================================================
@@ -107,13 +102,15 @@ with st.sidebar:
     selection = st.radio("Gestion", list(nav_options.keys()))
     admin_view = nav_options[selection]
 
-
-# =====================================================
-# Fonctions de rendu
-# =====================================================
+from core.maintenance import process_inactive_users, reorder_user_ids
 
 def render_overview():
     st.markdown('<h2 class="section-title">📊 Vue d\'ensemble</h2>', unsafe_allow_html=True)
+    
+    # Exécuter la maintenance automatique
+    count, emails = process_inactive_users(current_user_id=st.session_state.get("user_id"))
+    if count > 0:
+        st.warning(f"⚠️ {count} comptes ont été suspendus pour inactivité : {', '.join(emails)}")
     
     # KPIs
     df_u = load_sql_to_dataframe("SELECT COUNT(*) as count FROM users")
@@ -144,10 +141,39 @@ def render_users_page():
     tab1, tab2 = st.tabs(["Liste des Utilisateurs", "➕ Ajouter un Utilisateur"])
     
     with tab1:
-        df_users = load_sql_to_dataframe("SELECT user_id, role, first_name, last_name, email, is_active, created_at FROM users")
-        if not df_users.empty:
-            st.dataframe(df_users, use_container_width=True, hide_index=True)
+        # Résumé rapide
+        df_stats = load_sql_to_dataframe("SELECT is_active, COUNT(*) as count FROM users GROUP BY is_active")
+        active_count = df_stats[df_stats['is_active'] == 1]['count'].sum() if not df_stats[df_stats['is_active'] == 1].empty else 0
+        inactive_count = df_stats[df_stats['is_active'] == 0]['count'].sum() if not df_stats[df_stats['is_active'] == 0].empty else 0
+        
+        c1, c2 = st.columns(2)
+        c1.metric("Comptes Actifs", active_count)
+        c2.metric("Comptes Suspendus", inactive_count)
+        
+        # Filtre
+        filter_status = st.radio("Afficher :", ["Tous", "Actifs", "Suspendus"], horizontal=True)
+        
+        query = "SELECT user_id, role, first_name, last_name, email, is_active, created_at FROM users"
+        if filter_status == "Actifs":
+            query += " WHERE is_active = 1"
+        elif filter_status == "Suspendus":
+            query += " WHERE is_active = 0"
             
+        df_users = load_sql_to_dataframe(query)
+        if not df_users.empty:
+            # Transformation pour l'affichage
+            df_display = df_users.copy()
+            df_display['Status'] = df_display['is_active'].apply(lambda x: "✅ Actif" if x == 1 else "🚫 Suspendu")
+            
+            st.dataframe(df_display.drop(columns=['is_active']), use_container_width=True, hide_index=True)
+            
+            if st.button("🔄 Réorganiser les IDs (Fixer l'incrémentation)", help="Supprime les trous dans la suite des IDs"):
+                if reorder_user_ids():
+                    st.success("IDs réorganisés avec succès !")
+                    st.rerun()
+                else:
+                    st.error("Erreur lors de la réorganisation.")
+
             st.markdown("### 🛠️ Actions sur les comptes")
             col_sel, col_act = st.columns([1, 1])
             
@@ -171,12 +197,15 @@ def render_users_page():
                         if selected_user['user_id'] == st.session_state.get("user_id") and new_role != 'admin':
                             st.error("Vous ne pouvez pas retirer vos propres droits admin.")
                         else:
-                            execute_query(
-                                "UPDATE users SET first_name=?, last_name=?, email=?, role=? WHERE user_id=?",
-                                (new_first, new_last, new_email, new_role, selected_user['user_id'])
-                            )
-                            st.success("Utilisateur mis à jour !")
-                            st.rerun()
+                            try:
+                                execute_query(
+                                    "UPDATE users SET first_name=?, last_name=?, email=?, role=? WHERE user_id=?",
+                                    (new_first, new_last, new_email, new_role, int(selected_user['user_id']))
+                                )
+                                st.success(f"Utilisateur {new_email} mis à jour avec succès !")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erreur lors de la mise à jour : {e}")
             
             elif action_type == "Status (Actif/Inactif)":
                 current_status = "Actif" if selected_user['is_active'] == 1 else "Inactif"
@@ -199,7 +228,8 @@ def render_users_page():
                         st.error("Vous ne pouvez pas supprimer votre propre compte.")
                     else:
                         execute_query(f"DELETE FROM users WHERE user_id = {selected_user['user_id']}")
-                        st.warning("Utilisateur supprimé.")
+                        reorder_user_ids()
+                        st.warning("Utilisateur supprimé et IDs réordonnés.")
                         st.rerun()
         else:
             st.info("Aucun utilisateur trouvé.")
@@ -214,7 +244,7 @@ def render_users_page():
             role = st.selectbox("Rôle", ["admin", "owner", "researcher"])
             if st.form_submit_button("Créer l'utilisateur", type="primary"):
                 if first_name and last_name and email and password:
-                    hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                    hashed_pw = hash_password(password)
                     try:
                         execute_query(
                             "INSERT INTO users (role, first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?, 1)",
