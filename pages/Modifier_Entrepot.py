@@ -147,14 +147,39 @@ with left:
 
     with st.container(border=True):
         fichier_env = st.file_uploader(
-            "Importer un nouveau fichier CSV (Remplacera l'ancien)",
+            "Fichier CSV des capteurs IoT (Remplacera l'historique existant)",
             type=["csv"]
         )
 
         if fichier_env:
             df_env = pd.read_csv(fichier_env)
-            st.info("ℹ️ Ce fichier remplacera l'historique IoT existant après enregistrement.")
-            st.dataframe(df_env.head())
+            st.info(f"ℹ️ {len(df_env)} lignes chargées. Ce fichier remplacera l'historique IoT existant après enregistrement.")
+            st.dataframe(df_env.head(3))
+        else:
+            st.markdown("""
+<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;margin:8px 0;font-size:13px;">
+    <strong>📋 Colonnes du fichier CSV attendues</strong><br/>
+    <table style="width:100%;margin-top:8px;border-collapse:collapse;">
+        <tr style="background:#fef9c3;">
+            <th style="padding:5px 8px;text-align:left;">Colonne</th>
+            <th style="padding:5px 8px;text-align:left;">Obligatoire</th>
+            <th style="padding:5px 8px;text-align:left;">Alias acceptés</th>
+        </tr>
+        <tr><td style="padding:4px 8px;"><code>date</code></td><td style="padding:4px 8px;">✅ Oui</td><td style="padding:4px 8px;"><code>datetime</code>, <code>timestamp</code>, <code>recorded_at</code>, <code>heure</code>, <code>time</code></td></tr>
+        <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>temp_1</code></td><td style="padding:4px 8px;">✅ Au moins 1</td><td style="padding:4px 8px;"><code>temperature_1</code>, <code>t1</code>, <code>temp1</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>temp_2</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>temperature_2</code>, <code>t2</code>, <code>temp2</code></td></tr>
+        <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>temp_3</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>temperature_3</code>, <code>t3</code>, <code>temp3</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>hum_1</code></td><td style="padding:4px 8px;">✅ Au moins 1</td><td style="padding:4px 8px;"><code>humidite_1</code>, <code>humidity_1</code>, <code>h1</code>, <code>hum1</code></td></tr>
+        <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>hum_2</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>humidite_2</code>, <code>humidity_2</code>, <code>h2</code>, <code>hum2</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>hum_3</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>humidite_3</code>, <code>humidity_3</code>, <code>h3</code>, <code>hum3</code></td></tr>
+    </table>
+    <div style="margin-top:10px;background:#fff7ed;border-radius:6px;padding:8px;color:#92400e;font-size:12px;">
+        💡 <strong>Exemple minimal :</strong><br/>
+        <code>date,temp_1,temp_2,temp_3,hum_1,hum_2,hum_3</code><br/>
+        <code>2025-01-01 08:00:00,22.5,21.8,23.1,48.3,47.9,49.0</code>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # =====================================================
 # CAPACITÉ & VOLUME

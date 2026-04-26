@@ -179,8 +179,68 @@ else:
 if st.button("Se déconnecter", key="logout_btn"):
     st.session_state.clear()
     st.switch_page("pages/1_Login.py")
+
+st.divider()
+
 # =====================================================
-# Footer
+# Import CSV données IoT capteurs
 # =====================================================
+st.subheader("📡 Import de données IoT (Capteurs)")
+
+owner_id   = st.session_state['user']['user_id']
+from core.auth import get_warehouses_by_owner
+my_wh = get_warehouses_by_owner(owner_id)
+
+if not my_wh:
+    st.info("Aucun entrepôt enregistré. Ajoutez un entrepôt pour pouvoir importer des données IoT.")
+else:
+    wh_options = {w['name']: w['id'] for w in my_wh}
+    selected_wh_name = st.selectbox("Sélectionnez l'entrepôt cible", list(wh_options.keys()), key="iot_wh_select")
+    selected_wh_id   = wh_options[selected_wh_name]
+
+    iot_file = st.file_uploader(
+        "Fichier CSV des capteurs IoT",
+        type=["csv"],
+        key="iot_upload",
+        label_visibility="collapsed"
+    )
+
+    if iot_file:
+        import pandas as pd
+        df_preview = pd.read_csv(iot_file)
+        st.success(f"✅ {len(df_preview)} lignes chargées — Aperçu :")
+        st.dataframe(df_preview.head(3))
+
+        if st.button("💾 Importer dans la base de données", key="iot_import_btn", type="primary"):
+            iot_file.seek(0)
+            from core.auth import import_iot_csv
+            ok, msg = import_iot_csv(selected_wh_id, pd.read_csv(iot_file))
+            if ok:
+                st.success(msg)
+            else:
+                st.error(msg)
+    else:
+        st.markdown("""
+<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;margin:8px 0;font-size:13px;">
+    <strong>📋 Colonnes requises</strong><br/>
+    <table style="width:100%;margin-top:8px;border-collapse:collapse;">
+        <tr style="background:#fef9c3;">
+            <th style="padding:5px 8px;text-align:left;">Colonne</th>
+            <th style="padding:5px 8px;text-align:left;">Obligatoire</th>
+            <th style="padding:5px 8px;text-align:left;">Alias acceptés</th>
+        </tr>
+        <tr><td style="padding:4px 8px;"><code>date</code></td><td style="padding:4px 8px;">✅ Oui</td><td style="padding:4px 8px;"><code>datetime</code>, <code>timestamp</code>, <code>recorded_at</code>, <code>heure</code></td></tr>
+        <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>temp_1</code></td><td style="padding:4px 8px;">⚪ Au moins 1</td><td style="padding:4px 8px;"><code>temperature_1</code>, <code>t1</code>, <code>temp1</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>temp_2</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>temperature_2</code>, <code>t2</code>, <code>temp2</code></td></tr>
+        <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>temp_3</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>temperature_3</code>, <code>t3</code>, <code>temp3</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>hum_1</code></td><td style="padding:4px 8px;">⚪ Au moins 1</td><td style="padding:4px 8px;"><code>humidite_1</code>, <code>humidity_1</code>, <code>h1</code></td></tr>
+        <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>hum_2</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>humidite_2</code>, <code>humidity_2</code>, <code>h2</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>hum_3</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>humidite_3</code>, <code>humidity_3</code>, <code>h3</code></td></tr>
+    </table>
+    <div style="margin-top:8px;color:#92400e;font-size:12px;">💡 Exemple minimal : <code>date,temp_1,hum_1</code><br/>2025-01-01 08:00:00,22.5,48.3</div>
+</div>
+""", unsafe_allow_html=True)
+
+
 st.write("")
 st.caption("LogiTech Admin — Warehouse Monitoring Dashboard")

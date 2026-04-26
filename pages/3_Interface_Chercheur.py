@@ -118,8 +118,25 @@ with left:
 
     if livraison_file:
         df_livraison = pd.read_csv(livraison_file)
-        st.success("✅ Points de livraison importés")
-        st.dataframe(df_livraison.head())
+        st.success(f"✅ {len(df_livraison)} points de livraison importés")
+        st.dataframe(df_livraison.head(3))
+    else:
+        st.markdown("""
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;margin:8px 0;font-size:13px;">
+    <strong>📋 Colonnes requises</strong><br/>
+    <table style="width:100%;margin-top:8px;border-collapse:collapse;">
+        <tr style="background:#dbeafe;">
+            <th style="padding:5px 8px;text-align:left;">Colonne</th>
+            <th style="padding:5px 8px;text-align:left;">Obligatoire</th>
+            <th style="padding:5px 8px;text-align:left;">Alias acceptés</th>
+        </tr>
+        <tr><td style="padding:4px 8px;"><code>name</code></td><td style="padding:4px 8px;">✅ Oui</td><td style="padding:4px 8px;"><code>nom</code>, <code>point</code></td></tr>
+        <tr style="background:#f0f9ff;"><td style="padding:4px 8px;"><code>latitude</code></td><td style="padding:4px 8px;">✅ Oui</td><td style="padding:4px 8px;"><code>lat</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>longitude</code></td><td style="padding:4px 8px;">✅ Oui</td><td style="padding:4px 8px;"><code>lon</code></td></tr>
+    </table>
+    <div style="margin-top:8px;color:#1d4ed8;font-size:12px;">💡 Exemple : <code>name,latitude,longitude</code><br/>Paris Centre,48.8566,2.3522</div>
+</div>
+""", unsafe_allow_html=True)
 
     st.write("")
 
@@ -133,8 +150,27 @@ with left:
 
     if entrepot_file:
         df_entrepot = pd.read_csv(entrepot_file)
-        st.success("✅ Entrepôts importés")
-        st.dataframe(df_entrepot.head())
+        st.success(f"✅ {len(df_entrepot)} entrepôts importés")
+        st.dataframe(df_entrepot.head(3))
+    else:
+        st.markdown("""
+<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;margin:8px 0;font-size:13px;">
+    <strong>📋 Colonnes requises</strong><br/>
+    <table style="width:100%;margin-top:8px;border-collapse:collapse;">
+        <tr style="background:#dcfce7;">
+            <th style="padding:5px 8px;text-align:left;">Colonne</th>
+            <th style="padding:5px 8px;text-align:left;">Obligatoire</th>
+            <th style="padding:5px 8px;text-align:left;">Alias acceptés</th>
+        </tr>
+        <tr><td style="padding:4px 8px;"><code>id_entrepot</code></td><td style="padding:4px 8px;">✅ Oui</td><td style="padding:4px 8px;"><code>id</code></td></tr>
+        <tr style="background:#f0fdf4;"><td style="padding:4px 8px;"><code>nom</code></td><td style="padding:4px 8px;">⚪ Non</td><td style="padding:4px 8px;"><code>name</code>, <code>entrepot</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>adresse</code></td><td style="padding:4px 8px;">⚪ Non</td><td style="padding:4px 8px;"><code>address</code></td></tr>
+        <tr style="background:#f0fdf4;"><td style="padding:4px 8px;"><code>latitude</code></td><td style="padding:4px 8px;">✅ Oui</td><td style="padding:4px 8px;"><code>lat</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>longitude</code></td><td style="padding:4px 8px;">✅ Oui</td><td style="padding:4px 8px;"><code>lon</code></td></tr>
+    </table>
+    <div style="margin-top:8px;color:#15803d;font-size:12px;">💡 Exemple : <code>id_entrepot,nom,adresse,latitude,longitude</code><br/>ENT001,Entrepôt Casablanca,Av. Hassan II,33.5731,-7.5898</div>
+</div>
+""", unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -171,7 +207,6 @@ with right:
             placeholder="7"
         )
 
-        st.write("")
 
         submit = st.form_submit_button("🚀 Lancer l’optimisation")
 
