@@ -1,96 +1,186 @@
 import streamlit as st
-import pandas as pd
-from utils.db import load_sql_to_dataframe, execute_query
 
-st.set_page_config(page_title="Interface Propriétaire", page_icon="🏢", layout="wide")
+# =====================================================
+# Configuration de la page
+# =====================================================
+st.set_page_config(
+    page_title="Warehouse Management | LogiTech Admin",
+    page_icon="🏭",
+    layout="wide"
+)
 
-if "user_id" not in st.session_state or st.session_state.get("role") not in ["owner", "admin"]:
-    st.warning("Veuillez vous connecter en tant que propriétaire pour accéder à cette page.")
+# =====================================================
+# Vérification de sécurité
+# =====================================================
+if 'logged_in' not in st.session_state or not st.session_state.get('logged_in'):
+    st.warning("🔒 Accès refusé. Veuillez vous connecter d'abord.")
+    st.switch_page("pages/1_Login.py")
     st.stop()
 
-col1, col2 = st.columns([8, 2])
+if st.session_state.get('user', {}).get('role') != 'owner':
+    st.error("🔒 Accès réservé aux propriétaires d'entrepôt.")
+    st.stop()
+
+user_name = st.session_state['user'].get('first_name', 'Propriétaire')
+
+# =====================================================
+# CSS (style simplifié)
+# =====================================================
+st.markdown("""
+<style>
+body {
+    font-family: Inter, sans-serif;
+}
+.header {
+    background-color: #f8f9ff;
+    padding: 16px 24px;
+    border-bottom: 1px solid #c1c7d3;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.app-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #00457f;
+}
+.card {
+    background: white;
+    border: 1px solid #c1c7d3;
+    border-radius: 14px;
+    padding: 24px;
+}
+.action-card {
+    border-radius: 16px;
+    border: 1px solid #c1c7d3;
+    padding: 24px;
+}
+.small {
+    font-size: 13px;
+    color: #414751;
+}
+
+.badge-ok {
+    background: #dcfce7;
+    color: #166534;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+.badge-unavailable {
+    background: #ffedd5;
+    color: #9a3412;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+.badge-maint {
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+.status-text {
+    font-weight: 700;
+    font-size: 13px;
+}
+.status-ok {
+    color: #166534;
+}
+.status-unavailable {
+    color: #9a3412;
+}
+.status-maint {
+    color: #475569;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# =====================================================
+# Header
+# =====================================================
+st.markdown(f"""
+<div class="header">
+    <span class="app-title">🏭 LogiTech Admin</span>
+    <span style="color: #00457f; font-weight: 600;">👋 Bonjour, {user_name}</span>
+</div>
+""", unsafe_allow_html=True)
+
+if st.button("Se déconnecter", key="logout_btn"):
+    st.session_state.clear()
+    st.switch_page("pages/1_Login.py")
+
+st.write("")
+
+# =====================================================
+# Actions principales
+# =====================================================
+st.subheader("Primary Actions")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("""
+    <div class="action-card">
+        <h3 style="color:#00457f;">📦 Gérer les entrepôts existants</h3>
+        <p class="small">
+        Visualisez, modifiez et surveillez l’état de vos unités de stockage.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("Accéder à la liste ➜", key="manage"):
+        st.switch_page("pages/Liste_Entrepots.py")
+
 with col2:
-    if st.button("🚪 Se déconnecter", use_container_width=True):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
+    st.markdown("""
+    <div class="action-card">
+        <h3 style="color:#9a4600;">➕ Ajouter un nouvel entrepôt</h3>
+        <p class="small">
+        Enregistrez une nouvelle unité et configurez ses capteurs IoT.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("Démarrer la configuration ➜", key="add"):
+        st.switch_page("pages/Ajout_Entrepot.py")
 
-st.title("🏢 Espace Propriétaire")
-st.markdown("Gérez vos entrepôts et consultez vos contrats en cours.")
+st.write("")
 
-owner_id = st.session_state["user_id"]
+# =====================================================
+# Unités récentes (Récupérées de la base de données)
+# =====================================================
+st.subheader("Unités récentes")
 
-with st.expander("➕ Déclarer un nouvel entrepôt"):
-    with st.form("add_warehouse_form_prop"):
-        wh_id = st.text_input("ID Entrepôt (ex: ENT_002)")
-        wh_name = st.text_input("Nom de l'entrepôt")
-        
-        c1, c2, c3 = st.columns(3)
-        vol = c1.number_input("Volume (m³)", min_value=1.0, value=1000.0)
-        lat = c2.number_input("Latitude", format="%.6f", value=33.5)
-        lon = c3.number_input("Longitude", format="%.6f", value=-7.5)
-        submit_wh = st.form_submit_button("Ajouter mon entrepôt", type="primary")
-        
-        if submit_wh:
-            if wh_id and wh_name:
-                try:
-                    execute_query(
-                        "INSERT INTO warehouses (warehouse_id, owner_id, name, volume_m3, latitude, longitude, status) VALUES (?, ?, ?, ?, ?, ?, 'available')",
-                        (wh_id, owner_id, wh_name, vol, lat, lon)
-                    )
-                    st.success("Votre entrepôt a été ajouté avec succès !")
-                except Exception as e:
-                    st.error(f"Erreur : {e}")
-            else:
-                st.warning("Veuillez renseigner l'ID et le nom.")
+from core.auth import get_recent_warehouses_by_owner
+recent_units = get_recent_warehouses_by_owner(st.session_state['user']['user_id'], limit=3)
 
-st.header("Mes Entrepôts")
-df_wh = load_sql_to_dataframe(f"SELECT warehouse_id, name, volume_m3, latitude, longitude, status FROM warehouses WHERE owner_id = {owner_id}")
-
-if not df_wh.empty:
-    st.dataframe(df_wh, use_container_width=True, hide_index=True)
-    
-    with st.expander("📡 Importer un historique IoT (CSV) pour un entrepôt"):
-        st.caption("Le fichier CSV doit contenir les colonnes : datetime, T_C1, T_C2, T_C3, H_C1, H_C2, H_C3")
-        target_wh = st.selectbox("Sélectionnez l'entrepôt", df_wh['warehouse_id'].tolist())
-        uploaded_file = st.file_uploader("Fichier CSV", type=["csv"])
-        if uploaded_file is not None:
-            if st.button("Importer les données IoT"):
-                try:
-                    df_iot = pd.read_csv(uploaded_file)
-                    # Vérification basique des colonnes
-                    req_cols = ['datetime', 'T_C1', 'T_C2', 'T_C3', 'H_C1', 'H_C2', 'H_C3']
-                    if all(c in df_iot.columns for c in req_cols):
-                        import sqlite3
-                        import os
-                        DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "database", "optistock.db")
-                        conn = sqlite3.connect(DB_PATH)
-                        df_insert = pd.DataFrame()
-                        df_insert['warehouse_id'] = [target_wh] * len(df_iot)
-                        df_insert['recorded_at'] = df_iot['datetime']
-                        df_insert['temp_sensor_1'] = df_iot['T_C1']
-                        df_insert['temp_sensor_2'] = df_iot['T_C2']
-                        df_insert['temp_sensor_3'] = df_iot['T_C3']
-                        df_insert['hum_sensor_1'] = df_iot['H_C1']
-                        df_insert['hum_sensor_2'] = df_iot['H_C2']
-                        df_insert['hum_sensor_3'] = df_iot['H_C3']
-                        
-                        df_insert.to_sql('iot_readings', conn, if_exists='append', index=False)
-                        st.success(f"✅ {len(df_insert)} enregistrements IoT ajoutés avec succès à {target_wh}.")
-                    else:
-                        st.error(f"Le fichier doit contenir les colonnes : {', '.join(req_cols)}")
-                except Exception as e:
-                    st.error(f"Erreur lors de l'importation : {e}")
-    
-    st.subheader("Mes Réservations / Contrats Actifs")
-    # Fetch reservations for their warehouses
-    warehouse_ids = "', '".join(df_wh['warehouse_id'].tolist())
-    query = f"SELECT reservation_id, warehouse_id, status, global_score, created_at FROM reservations WHERE warehouse_id IN ('{warehouse_ids}') AND status IN ('pre_lock', 'confirmed')"
-    
-    df_res = load_sql_to_dataframe(query)
-    if not df_res.empty:
-        st.dataframe(df_res, use_container_width=True, hide_index=True)
-    else:
-        st.info("Aucune réservation active pour le moment.")
+if not recent_units:
+    st.info("Aucun entrepôt enregistré pour le moment.")
 else:
-    st.warning("Vous ne possédez aucun entrepôt dans le système.")
+    for unit in recent_units:
+        badge_class = "badge-ok"
+        if unit['status'] == "Non disponible": badge_class = "badge-unavailable"
+        elif unit['status'] == "Maintenance": badge_class = "badge-maint"
+        
+        st.markdown(f"""
+        <div class="card" style="margin-bottom: 16px;">
+            <div style="display:flex; justify-content: space-between; align-items:center;">
+                <div>
+                    <span class="{badge_class}">{unit['status']}</span>
+                    <h4>{unit['name']}</h4>
+                </div>
+                <span class="status-text {"status-ok" if unit['status']=="Disponible" else "status-unavailable" if unit['status']=="Non disponible" else "status-maint"}">{unit['status']}</span>
+            </div>
+            <p class="small">📍 {unit['address']}</p>
+            <p class="small">🛰 GPS: {unit['gps']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+# =====================================================
+# Footer
+# =====================================================
+st.write("")
+st.caption("LogiTech Admin — Warehouse Monitoring Dashboard")

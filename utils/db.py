@@ -2,7 +2,7 @@ import sqlite3
 import pandas as pd
 import os
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "database", "optistock.db")
+DB_PATH = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "database", "optistock.db"))
 
 def get_db_connection():
     """Crée et retourne une connexion à la base de données SQLite."""

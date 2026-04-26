@@ -1,19 +1,32 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "optistock.db")
+DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "optistock.db"))
 
 def create_database():
     """Crée ou réinitialise la base de données avec le nouveau schéma EARSER."""
     
     if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
-        print("🔄 Ancienne base de données supprimée.")
+        try:
+            os.remove(DB_PATH)
+            print("Ancienne base de donnees supprimee.")
+        except PermissionError:
+            print("Impossible de supprimer le fichier (verrouille). Nettoyage des tables existantes...")
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     # Activer les contraintes de clés étrangères
+    cursor.execute("PRAGMA foreign_keys = OFF;")
+    
+    # Nettoyage
+    cursor.execute("DROP TABLE IF EXISTS iot_readings")
+    cursor.execute("DROP TABLE IF EXISTS reservations")
+    cursor.execute("DROP TABLE IF EXISTS my_warehouse")
+    cursor.execute("DROP TABLE IF EXISTS delivery_points")
+    cursor.execute("DROP TABLE IF EXISTS warehouses")
+    cursor.execute("DROP TABLE IF EXISTS users")
+    
     cursor.execute("PRAGMA foreign_keys = ON;")
 
     # 1. Table users
@@ -37,11 +50,11 @@ def create_database():
             warehouse_id TEXT PRIMARY KEY,
             owner_id INTEGER,
             name TEXT,
+            address TEXT,
             volume_m3 REAL,
             latitude REAL,
             longitude REAL,
-            status TEXT DEFAULT 'available' CHECK(status IN ('available', 'unavailable', 'locked')),
-            locked_at DATETIME,
+            status TEXT DEFAULT 'available' CHECK(status IN ('available', 'unavailable')),
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE SET NULL
         )
@@ -53,14 +66,27 @@ def create_database():
             request_id TEXT PRIMARY KEY,
             researcher_id INTEGER,
             name TEXT,
-            product_type TEXT,
             latitude REAL,
             longitude REAL,
             FOREIGN KEY (researcher_id) REFERENCES users(user_id) ON DELETE CASCADE
         )
     ''')
 
-    # 4. Table reservations
+    # 4. Table my_warehouse (Pour les imports chercheurs)
+    cursor.execute("DROP TABLE IF EXISTS my_warehouse")
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS my_warehouse (
+            id_entrepot TEXT PRIMARY KEY,
+            researcher_id INTEGER,
+            nom TEXT,
+            adresse TEXT,
+            latitude REAL,
+            longitude REAL,
+            FOREIGN KEY (researcher_id) REFERENCES users(user_id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 5. Table reservations
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS reservations (
             reservation_id TEXT PRIMARY KEY,
@@ -102,7 +128,7 @@ def create_database():
     conn.commit()
     conn.close()
     
-    print(f"✅ Base de données SQLite (Schéma EARSER) créée avec succès : {DB_PATH}")
+    print(f"Base de données SQLite (Schéma EARSER) créée avec succès : {DB_PATH}")
 
 if __name__ == "__main__":
     create_database()

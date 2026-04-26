@@ -4,8 +4,8 @@ import streamlit as st
 # Configuration de la page
 # =====================================================
 st.set_page_config(
-    page_title="OptiStock – Connexion",
-    page_icon="🔐",
+    page_title="OptiStock – Inscription",
+    page_icon="📝",
     layout="wide"
 )
 
@@ -74,7 +74,7 @@ st.markdown("""
 st.markdown("<div style='height:90px'></div>", unsafe_allow_html=True)
 
 # =====================================================
-# Carte de connexion (Format Desktop)
+# Carte d'inscription (Format Desktop)
 # =====================================================
 st.write("") # Espacement vertical
 col_img, col_form = st.columns([1.2, 1], gap="large")
@@ -82,23 +82,33 @@ col_img, col_form = st.columns([1.2, 1], gap="large")
 with col_img:
     st.markdown('''
     <div style="padding-top: 40px; padding-left: 20px;">
-        <h2 style="color: #005da7; font-size: 2rem;">L'intelligence au service de votre logistique</h2>
-        <p style="color: #555d64; font-size: 1.1rem; margin-bottom: 24px;">Connectez-vous pour superviser vos inventaires en temps réel, analyser vos données logistiques et prendre les meilleures décisions.</p>
+        <h2 style="color: #005da7; font-size: 2rem;">Rejoignez la révolution logistique</h2>
+        <p style="color: #555d64; font-size: 1.1rem; margin-bottom: 24px;">Créez votre compte pour optimiser vos flux de stockage et rejoindre les leaders de l'industrie pour une gestion intelligente.</p>
     </div>
     ''', unsafe_allow_html=True)
-    st.image("https://images.unsplash.com/photo-1580674285054-bed31e145f59?q=80&w=2070&auto=format&fit=crop", use_container_width=True)
+    st.image("https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2000&auto=format&fit=crop", use_container_width=True)
 
 with col_form:
     st.markdown('<div class="login-card" style="max-width: 500px; margin: 0 auto;">', unsafe_allow_html=True)
 
-    st.markdown("## 👋 Bon retour")
-    st.caption("Connectez-vous pour gérer votre chaîne logistique")
+    st.markdown("## 📝 Créer un compte")
+    st.caption("Rejoignez OptiStock Logistics Intelligence")
 
     st.write("")
+
+    nom = st.text_input(
+        "Nom complet",
+        placeholder="Votre nom"
+    )
 
     email = st.text_input(
         "Adresse e-mail",
         placeholder="nom@entreprise.com"
+    )
+
+    role = st.selectbox(
+        "Sélectionnez votre profil",
+        options=["Propriétaire d'entrepôt", "Chercheur d'entrepôt"]
     )
 
     password = st.text_input(
@@ -107,47 +117,42 @@ with col_form:
         placeholder="••••••••"
     )
 
-    col_btn1, col_btn2 = st.columns([2, 1])
-    with col_btn1:
-        submit = st.button("🔐 Se connecter", use_container_width=True)
+    password_confirm = st.text_input(
+        "Confirmer le mot de passe",
+        type="password",
+        placeholder="••••••••"
+    )
 
-    with col_btn2:
-        if st.button("❓ Mot de passe oublié"):
-            st.info("Lien de récupération envoyé par email (simulé)")
-
-    if submit:
-        if not email or not password:
-            st.error("Veuillez renseigner votre email et votre mot de passe")
+    if st.button("🚀 S'inscrire", use_container_width=True):
+        if not nom or not email or not password or not password_confirm:
+            st.error("Veuillez remplir tous les champs")
+        elif password != password_confirm:
+            st.error("Les mots de passe ne correspondent pas")
         else:
-            from core.auth import authenticate_user
-            user = authenticate_user(email, password)
+            role_map = {
+                "Propriétaire d'entrepôt": "owner",
+                "Chercheur d'entrepôt": "researcher",
+                "Administrateur": "admin"
+            }
+            db_role = role_map.get(role, "owner")
             
-            if user:
-                if user['is_active'] == 0:
-                    st.error("❌ Votre compte est désactivé.")
-                else:
-                    st.success(f"✅ Bienvenue {user['first_name']} ! Connexion réussie.")
-                    st.session_state['user'] = user
-                    st.session_state['user_id'] = user['user_id']
-                    st.session_state['role'] = user['role']
-                    st.session_state['logged_in'] = True
-                    
-                    if user['role'] == 'admin':
-                        st.switch_page("pages/2_Dashboard_Admin.py")
-                    elif user['role'] == 'researcher':
-                        st.switch_page("pages/3_Interface_Chercheur.py")
-                    elif user['role'] == 'owner':
-                        st.switch_page("pages/4_Interface_Proprietaire.py")
+            parts = nom.split(" ", 1)
+            first_name = parts[0]
+            last_name = parts[1] if len(parts) > 1 else ""
+            
+            from core.auth import create_user
+            success = create_user(db_role, first_name, last_name, email, password)
+            if success:
+                st.success("✅ Compte créé avec succès !")
+                st.info("Vous pouvez maintenant vous connecter.")
             else:
-                st.error("❌ Identifiants incorrects.")
+                st.error("Erreur : Adresse e-mail déjà utilisée ou problème serveur.")
 
     st.markdown("---")
-    col1, col2 = st.columns([1, 1.2])
-    with col1:
-        st.markdown("<p style='margin-top: 8px;'>Pas encore de compte ?</p>", unsafe_allow_html=True)
-    with col2:
-        if st.button("Créer un compte", use_container_width=True):
-            st.switch_page("pages/Signup.py")
+    
+    st.write("Vous avez déjà un compte ?")
+    if st.button("Se connecter", use_container_width=True):
+        st.switch_page("pages/1_Login.py")
 
     st.markdown("</div>", unsafe_allow_html=True)
 

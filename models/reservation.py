@@ -14,6 +14,7 @@ System_Pre_Lock — Mécanisme de verrouillage applicatif persistant (SQLite) :
 ═══════════════════════════════════════════════════════════════════════════════
 """
 
+import pandas as pd
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from typing import Optional
@@ -157,4 +158,3 @@ class Reservation:
     def __repr__(self) -> str:
         return f"Reservation(id={self.reservation_id!r}, warehouse={self.warehouse_id!r}, status={self.status!r})"
 
-import pandas as pd
