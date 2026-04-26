@@ -105,7 +105,7 @@ body {
 # =====================================================
 st.markdown(f"""
 <div class="header">
-    <span class="app-title">🏭 LogiTech Admin</span>
+    <span class="app-title">🏭 </span>
     <span style="color: #00457f; font-weight: 600;">👋 Bonjour, {user_name}</span>
 </div>
 """, unsafe_allow_html=True)

@@ -7,7 +7,7 @@ from core.auth import get_warehouses_by_owner
 # Configuration de la page
 # =====================================================
 st.set_page_config(
-    page_title="LogiTech Admin - Liste des Entrepôts",
+    page_title="Liste des Entrepôts",
     page_icon="🏬",
     layout="wide"
 )
@@ -108,7 +108,7 @@ body {
 # =====================================================
 st.markdown(f"""
 <div class="header">
-    <span class="title">📦 LogiTech Admin</span>
+    <span class="title">📦</span>
     <span style="color: #00457f; font-weight: 600;">👋 Bonjour, {user_name}</span>
 </div>
 """, unsafe_allow_html=True)
