@@ -76,7 +76,6 @@ st.markdown("<div style='height:90px'></div>", unsafe_allow_html=True)
 # =====================================================
 # Carte de connexion (Format Desktop)
 # =====================================================
-st.write("") # Espacement vertical
 col_img, col_form = st.columns([1.2, 1], gap="large")
 
 with col_img:
@@ -93,8 +92,6 @@ with col_form:
 
     st.markdown("## 👋 Bon retour")
     st.caption("Connectez-vous pour gérer votre chaîne logistique")
-
-    st.write("")
 
     email = st.text_input(
         "Adresse e-mail",

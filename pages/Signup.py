@@ -172,7 +172,6 @@ with col_form:
 
     st.markdown("## 📝 Créer un compte")
     st.caption("Rejoignez OptiStock Logistics Intelligence")
-    st.write("")
 
     # ── Nom complet ──────────────────────────────────
     nom = st.text_input("Nom complet", placeholder="Prénom Nom")
@@ -243,7 +242,6 @@ with col_form:
         else:
             st.error("❌ Les mots de passe ne correspondent pas.")
 
-    st.write("")
 
     # ── Bouton S'inscrire ─────────────────────────────
     if st.button("🚀 S'inscrire", use_container_width=True, type="primary"):
@@ -290,7 +288,7 @@ with col_form:
                 st.error("❌ Adresse e-mail déjà utilisée ou problème serveur.")
 
     st.markdown("---")
-    st.write("Vous avez déjà un compte ?")
+    st.caption("Vous avez déjà un compte ?")
     if st.button("Se connecter", use_container_width=True):
         st.switch_page("pages/1_Login.py")
 
