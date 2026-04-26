@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+from utils.product_conditions import PRODUCT_CONDITIONS
+from core.iot_filter import get_compliant_warehouses
 
 # =====================================================
 # Vérification de sécurité (Indispensable)
@@ -189,7 +191,7 @@ with right:
         with c1:
             produit = st.selectbox(
                 "Type de produit",
-                ["Tomates", "Médicaments", "Produits laitiers"]
+                options=list(PRODUCT_CONDITIONS.keys())
             )
 
         with c2:
@@ -281,13 +283,38 @@ with right:
                     st.error(f"❌ Erreur entrepôts : {e}")
 
             st.success(f"✅ Optimisation lancée ! {saved_points} points et {saved_warehouses} entrepôts enregistrés.")
-            st.json({
-                "Produit": produit,
-                "Volume_m3": volume,
-                "Stockage_jours": duree,
-                "Points_enregistres": saved_points,
-                "Entrepots_enregistres": saved_warehouses
             })
+
+            # --- NOUVELLE SECTION : PROPOSITIONS D'ENTREPÔTS ---
+            st.markdown("---")
+            st.markdown("### 🏘️ Entrepôts suggérés (Conformité IoT)")
+            
+            with st.spinner("Analyse des historiques IoT en cours..."):
+                suggestions = get_compliant_warehouses(produit, researcher_id=researcher_id)
+            
+            if suggestions:
+                st.info(f"Basé sur les conditions de conservation pour **{produit}**, voici les entrepôts conformes détectés dans notre réseau :")
+                
+                # Transformer en DataFrame pour l'affichage
+                df_sugg = pd.DataFrame(suggestions)
+                
+                # Mise en forme
+                st.dataframe(
+                    df_sugg[["nom", "avg_temp", "avg_hum", "status"]],
+                    column_config={
+                        "nom": "Nom de l'entrepôt",
+                        "avg_temp": st.column_config.NumberColumn("T° Moyenne (Recent)", format="%.1f °C"),
+                        "avg_hum": st.column_config.NumberColumn("Humidité Moyenne", format="%.1f %%"),
+                        "status": "Statut"
+                    },
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Bouton pour utiliser ces entrepôts (Simulé pour l'instant)
+                st.success(f"✅ {len(suggestions)} entrepôts sont prêts pour le traitement logistique.")
+            else:
+                st.warning(f"⚠️ Aucun entrepôt actuellement en service ne respecte strictement les conditions pour **{produit}**.")
 
 # Bouton de déconnexion (Optionnel mais recommandé)
 st.write("")
