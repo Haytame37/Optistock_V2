@@ -2,7 +2,7 @@ import streamlit as st
 import time
 from datetime import timedelta
 from utils.db import load_sql_to_dataframe
-from core.data_cleaning import clean_iot_data_pipeline
+from core.scoring import pretraiter_serie_capteurs
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from utils.product_conditions import PRODUCT_CONDITIONS
@@ -12,14 +12,74 @@ st.set_page_config(page_title="Suivi Temps Réel IoT", page_icon="⏱️", layou
 st.title("⏱️ Suivi Temps Réel IoT")
 st.caption("Simulation d'un flux de données temps réel (1 relevé = 15 minutes).")
 
+# =====================================================
+# Vérification de connexion & Rôles
+# =====================================================
+if 'logged_in' not in st.session_state or not st.session_state.get('logged_in'):
+    st.warning("🔒 Accès refusé. Veuillez vous connecter d'abord.")
+    st.switch_page("pages/1_Login.py")
+    st.stop()
+
+user_id = st.session_state.get('user_id')
+role = st.session_state.get('role')
+user_name = f"{st.session_state.get('user', {}).get('first_name', '')} {st.session_state.get('user', {}).get('last_name', '')}"
+
+st.sidebar.markdown(f"**Utilisateur :** {user_name}")
+st.sidebar.markdown(f"**Rôle :** {role.capitalize()}")
+
+# =====================================================
+# Récupération des entrepôts selon le rôle
+# =====================================================
+@st.cache_data
+def get_user_warehouses(u_id, u_role):
+    import pandas as pd
+    from utils.db import get_db_connection
+    conn = get_db_connection()
+    
+    if u_role == 'owner':
+        # Entrepôts possédés par le propriétaire
+        query = "SELECT warehouse_id, name FROM warehouses WHERE owner_id = ?"
+        df = pd.read_sql_query(query, conn, params=(u_id,))
+    elif u_role == 'researcher':
+        # Entrepôts réservés OU importés par le chercheur
+        query = """
+            SELECT DISTINCT w.warehouse_id, w.name 
+            FROM warehouses w
+            JOIN reservations r ON w.warehouse_id = r.warehouse_id
+            WHERE r.researcher_id = ?
+            UNION
+            SELECT DISTINCT id_entrepot as warehouse_id, nom as name
+            FROM my_warehouse
+            WHERE researcher_id = ?
+        """
+        df = pd.read_sql_query(query, conn, params=(u_id, u_id))
+    else:
+        # Admin : voit tout
+        query = "SELECT warehouse_id, name FROM warehouses"
+        df = pd.read_sql_query(query, conn)
+    
+    conn.close()
+    return df
+
+df_user_wh = get_user_warehouses(user_id, role)
+
+if df_user_wh.empty:
+    st.info("👋 Bienvenue ! Vous n'avez pas encore d'entrepôt à superviser.")
+    if role == 'researcher':
+        st.write("Importez vos données ou réservez un entrepôt dans l'interface chercheur.")
+    elif role == 'owner':
+        st.write("Ajoutez vos entrepôts au catalogue pour commencer le suivi.")
+    st.stop()
+
 # Sélecteur de contexte
 col_ctx1, col_ctx2 = st.columns(2)
 with col_ctx1:
     produit = st.selectbox("Produit suivi", list(PRODUCT_CONDITIONS.keys()))
 with col_ctx2:
-    df_wh = load_sql_to_dataframe("SELECT DISTINCT warehouse_id FROM iot_readings")
-    entrepot_list = df_wh["warehouse_id"].tolist() if not df_wh.empty else ["ENT_001"]
-    entrepot = st.selectbox("Entrepôt", entrepot_list)
+    # Créer un dictionnaire pour l'affichage (Nom - ID)
+    wh_options = {f"{row['name']} ({row['warehouse_id']})": row['warehouse_id'] for _, row in df_user_wh.iterrows()}
+    selected_label = st.selectbox("Entrepôt à superviser", list(wh_options.keys()))
+    entrepot = wh_options[selected_label]
 
 cond = PRODUCT_CONDITIONS[produit]
 t_min, t_max = cond["temperature"]["min"], cond["temperature"]["max"]
@@ -41,7 +101,7 @@ with col_btn1:
         st.session_state.rt_running = not st.session_state.rt_running
         st.rerun()
 with col_btn2:
-    if st.button("⏩ Avancer (15m)"):
+    if st.button("⏩ Avancer (1h)"):
         st.session_state.rt_index += 1
         st.rerun()
 
@@ -57,7 +117,7 @@ if df_rt.empty:
 cols_t = ["temp_sensor_1", "temp_sensor_2", "temp_sensor_3"]
 cols_h = ["hum_sensor_1", "hum_sensor_2", "hum_sensor_3"]
 
-df_rt = clean_iot_data_pipeline(df_rt, cols_t + cols_h)
+df_rt = pretraiter_serie_capteurs(df_rt, colonnes=cols_t + cols_h)
 df_rt["T"] = df_rt[cols_t].median(axis=1)
 df_rt["H"] = df_rt[cols_h].median(axis=1)
 
@@ -123,11 +183,13 @@ with kpi1:
 with kpi2:
     st.markdown(f"<div class='metric-box' style='border-left-color:{color_h};'><div class='metric-title'>💧 Humidité</div><div class='metric-value'>{current_h:.1f} %</div><div style='color:{color_h};font-size:0.8em;'>{statut_h} (Δ {delta_h:+.1f})</div></div>", unsafe_allow_html=True)
 with kpi3:
-    # Résistance temporelle (simplifiée pour le dashboard)
-    res_t = "OK"
-    if "Basse" in statut_t: res_t = f"{cond['temperature']['temps_resistance_bas_h']}h max"
-    elif "Haute" in statut_t: res_t = f"{cond['temperature']['temps_resistance_haut_h']}h max"
-    st.markdown(f"<div class='metric-box'><div class='metric-title'>⏳ Tolérance T°</div><div class='metric-value' style='font-size:1.2em;margin-top:10px;'>{res_t}</div></div>", unsafe_allow_html=True)
+    # Temps de tolérance minimal (Résistance garantie)
+    res_t = "Optimal"
+    if "Basse" in statut_t:
+        res_t = f"{cond['temperature']['temps_resistance_bas_min_h']}h"
+    elif "Haute" in statut_t:
+        res_t = f"{cond['temperature']['temps_resistance_haut_min_h']}h"
+    st.markdown(f"<div class='metric-box'><div class='metric-title'>⏳ Tolérance </div><div class='metric-value' style='font-size:1.2em;margin-top:10px;'>{res_t}</div></div>", unsafe_allow_html=True)
 with kpi4:
     st.markdown(f"<div class='metric-box'><div class='metric-title'>🎯 Indice Stabilité</div><div class='metric-value'>{stability_score}/100</div></div>", unsafe_allow_html=True)
 

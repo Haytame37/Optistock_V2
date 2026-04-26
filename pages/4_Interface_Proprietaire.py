@@ -230,10 +230,10 @@ else:
             <th style="padding:5px 8px;text-align:left;">Alias acceptés</th>
         </tr>
         <tr><td style="padding:4px 8px;"><code>date</code></td><td style="padding:4px 8px;">✅ Oui</td><td style="padding:4px 8px;"><code>datetime</code>, <code>timestamp</code>, <code>recorded_at</code>, <code>heure</code></td></tr>
-        <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>temp_1</code></td><td style="padding:4px 8px;">⚪ Au moins 1</td><td style="padding:4px 8px;"><code>temperature_1</code>, <code>t1</code>, <code>temp1</code></td></tr>
+        <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>temp_1</code></td><td style="padding:4px 8px;">✅ Au moins 1</td><td style="padding:4px 8px;"><code>temperature_1</code>, <code>t1</code>, <code>temp1</code></td></tr>
         <tr><td style="padding:4px 8px;"><code>temp_2</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>temperature_2</code>, <code>t2</code>, <code>temp2</code></td></tr>
         <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>temp_3</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>temperature_3</code>, <code>t3</code>, <code>temp3</code></td></tr>
-        <tr><td style="padding:4px 8px;"><code>hum_1</code></td><td style="padding:4px 8px;">⚪ Au moins 1</td><td style="padding:4px 8px;"><code>humidite_1</code>, <code>humidity_1</code>, <code>h1</code></td></tr>
+        <tr><td style="padding:4px 8px;"><code>hum_1</code></td><td style="padding:4px 8px;">✅ Au moins 1</td><td style="padding:4px 8px;"><code>humidite_1</code>, <code>humidity_1</code>, <code>h1</code></td></tr>
         <tr style="background:#fefce8;"><td style="padding:4px 8px;"><code>hum_2</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>humidite_2</code>, <code>humidity_2</code>, <code>h2</code></td></tr>
         <tr><td style="padding:4px 8px;"><code>hum_3</code></td><td style="padding:4px 8px;">⚪ Optionnel</td><td style="padding:4px 8px;"><code>humidite_3</code>, <code>humidity_3</code>, <code>h3</code></td></tr>
     </table>
