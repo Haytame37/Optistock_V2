@@ -67,15 +67,43 @@ body {
 }
 .pwd-rules ul li { margin-bottom: 3px; }
 
-/* Indicateur de force */
-.strength-bar {
-    height: 6px;
-    border-radius: 3px;
-    margin: 6px 0;
-    transition: width 0.3s ease;
+/* Widget de force du mot de passe */
+.strength-widget {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 6px 0 12px 0;
 }
-.rule-ok   { color: #16a34a; font-weight: 600; }
-.rule-fail { color: #dc2626; font-weight: 600; }
+.strength-label {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+.strength-track {
+    background: #e2e8f0;
+    border-radius: 4px;
+    height: 7px;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+.strength-fill {
+    height: 7px;
+    border-radius: 4px;
+}
+.rules-detail {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 12px;
+}
+.rule-row {
+    font-size: 12px;
+    color: #475569;
+    padding: 2px 0;
+}
+.rule-ok   { color: #16a34a; font-weight: 700; }
+.rule-fail { color: #dc2626; font-weight: 700; }
+.rule-empty { color: #94a3b8; font-weight: 700; }
 
 .footer {
     margin-top: 48px;
@@ -153,6 +181,24 @@ st.markdown("""
 
 st.markdown("<div style='height:90px'></div>", unsafe_allow_html=True)
 
+# Désactiver le gestionnaire de mots de passe du navigateur
+st.markdown("""
+<script>
+(function() {
+    function disablePwdManager() {
+        document.querySelectorAll('input[type="password"]').forEach(function(el) {
+            el.setAttribute('autocomplete', 'new-password');
+            el.setAttribute('data-lpignore', 'true');
+            el.setAttribute('data-form-type', 'other');
+        });
+    }
+    // Exécuter au chargement et après chaque mutation DOM (Streamlit rerenders)
+    disablePwdManager();
+    new MutationObserver(disablePwdManager).observe(document.body, {childList: true, subtree: true});
+})();
+</script>
+""", unsafe_allow_html=True)
+
 # =====================================================
 # Mise en page
 # =====================================================
@@ -195,45 +241,63 @@ with col_form:
     )
 
     # ── Mot de passe ─────────────────────────────────
-    st.markdown("""
-<div class="pwd-rules">
-    <strong>🔐 Exigences du mot de passe</strong>
-    <ul>
-        <li>8 caractères minimum</li>
-        <li>Au moins une lettre MAJUSCULE</li>
-        <li>Au moins une lettre minuscule</li>
-        <li>Au moins un chiffre (0-9)</li>
-        <li>Au moins un caractère spécial : <code>! @ # $ % ^ &amp; * _ - + =</code></li>
-        <li>Aucun espace autorisé</li>
-    </ul>
-</div>
-""", unsafe_allow_html=True)
+    password = st.text_input(
+        "Mot de passe",
+        type="password",
+        placeholder="••••••••",
+        key="pwd_input",
+        autocomplete="new-password"
+    )
 
-    password = st.text_input("Mot de passe", type="password", placeholder="••••••••")
-
-    # Indicateur de force en temps réel
+    # ── Indicateur de force en temps réel (toujours visible) ──────────────────
     if password:
         rules = check_password_rules(password)
         score, label, color = password_strength(rules)
         pct = int(score / 6 * 100)
 
+        # Construire les lignes HTML des règles
+        rules_html = "".join([
+            f'<div class="rule-row">{"<span class=\"rule-ok\">&#10003;</span>" if ok else "<span class=\"rule-fail\">&#10007;</span>"} {rule}</div>'
+            for rule, ok in rules.items()
+        ])
+
         st.markdown(f"""
-<div style="margin-bottom:4px; font-size:13px; color:{color}; font-weight:700;">
-    Force : {label} ({score}/6)
+<div class="strength-widget">
+    <div class="strength-label" style="color:{color};">Force : {label} ({score}/6)</div>
+    <div class="strength-track">
+        <div class="strength-fill" style="width:{pct}%; background:{color};"></div>
+    </div>
+    <div class="rules-detail">
+        {rules_html}
+    </div>
 </div>
-<div style="background:#e2e8f0; border-radius:3px; height:6px;">
-    <div style="width:{pct}%; background:{color}; height:6px; border-radius:3px; transition:width .3s;"></div>
+""", unsafe_allow_html=True)
+    else:
+        # Afficher les règles vides (toutes grises) quand rien n'est saisi
+        empty_rules = list(check_password_rules("").keys())
+        rules_html = "".join([
+            f'<div class="rule-row"><span class="rule-empty">&minus;</span> {r}</div>'
+            for r in empty_rules
+        ])
+        st.markdown(f"""
+<div class="strength-widget">
+    <div class="strength-label" style="color:#94a3b8;">Force : — (0/6)</div>
+    <div class="strength-track">
+        <div class="strength-fill" style="width:0%; background:#94a3b8;"></div>
+    </div>
+    <div class="rules-detail">
+        {rules_html}
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
-        # Détail de chaque règle
-        with st.expander("Détail des règles", expanded=(score < 6)):
-            for rule, ok in rules.items():
-                icon = "✅" if ok else "❌"
-                css  = "rule-ok" if ok else "rule-fail"
-                st.markdown(f'<span class="{css}">{icon} {rule}</span>', unsafe_allow_html=True)
-
-    password_confirm = st.text_input("Confirmer le mot de passe", type="password", placeholder="••••••••")
+    password_confirm = st.text_input(
+        "Confirmer le mot de passe",
+        type="password",
+        placeholder="••••••••",
+        key="pwd_confirm_input",
+        autocomplete="new-password"
+    )
 
     # Vérification correspondance en temps réel
     if password and password_confirm:

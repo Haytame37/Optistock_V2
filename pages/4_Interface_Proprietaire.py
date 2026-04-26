@@ -110,9 +110,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-if st.button("Se déconnecter", key="logout_btn"):
-    st.session_state.clear()
-    st.switch_page("pages/1_Login.py")
+
 
 st.write("")
 
@@ -178,7 +176,9 @@ else:
             <p class="small">🛰 GPS: {unit['gps']}</p>
         </div>
         """, unsafe_allow_html=True)
-
+if st.button("Se déconnecter", key="logout_btn"):
+    st.session_state.clear()
+    st.switch_page("pages/1_Login.py")
 # =====================================================
 # Footer
 # =====================================================
