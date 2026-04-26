@@ -283,7 +283,6 @@ with right:
                     st.error(f"❌ Erreur entrepôts : {e}")
 
             st.success(f"✅ Optimisation lancée ! {saved_points} points et {saved_warehouses} entrepôts enregistrés.")
-            })
 
             # --- NOUVELLE SECTION : PROPOSITIONS D'ENTREPÔTS ---
             st.markdown("---")
