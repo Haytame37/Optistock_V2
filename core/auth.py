@@ -2,6 +2,7 @@ import sqlite3
 import hashlib
 import os
 from utils.db import DB_PATH
+from utils.helpers import get_current_time
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -10,9 +11,10 @@ def create_user(role, first_name, last_name, email, password):
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+        now_str = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute(
-            "INSERT INTO users (role, first_name, last_name, email, password_hash) VALUES (?, ?, ?, ?, ?)",
-            (role, first_name, last_name, email, hash_password(password))
+            "INSERT INTO users (role, first_name, last_name, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (role, first_name, last_name, email, hash_password(password), now_str, now_str)
         )
         conn.commit()
         return True
@@ -59,10 +61,11 @@ def add_warehouse(owner_id, name, address, volume_m3, latitude, longitude):
         max_id = cursor.fetchone()[0]
         next_val = (max_id or 0) + 1
         warehouse_id = f"ENT{next_val:03d}"
+        now_str = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute('''
-            INSERT INTO warehouses (warehouse_id, owner_id, name, address, volume_m3, latitude, longitude, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'available')
-        ''', (warehouse_id, owner_id, name, address, volume_m3, latitude, longitude))
+            INSERT INTO warehouses (warehouse_id, owner_id, name, address, volume_m3, latitude, longitude, status, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?)
+        ''', (warehouse_id, owner_id, name, address, volume_m3, latitude, longitude, now_str))
         conn.commit()
         return warehouse_id
     except Exception as e:
@@ -106,11 +109,12 @@ def update_warehouse(warehouse_id, name, address, volume_m3, latitude, longitude
     try:
         conn = sqlite3.connect(DB_PATH, timeout=10)
         cursor = conn.cursor()
+        now_str = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute("""
             UPDATE warehouses 
-            SET name = ?, address = ?, volume_m3 = ?, latitude = ?, longitude = ?
+            SET name = ?, address = ?, volume_m3 = ?, latitude = ?, longitude = ?, updated_at = ?
             WHERE warehouse_id = ?
-        """, (name, address, volume_m3, latitude, longitude, warehouse_id))
+        """, (name, address, volume_m3, latitude, longitude, now_str, warehouse_id))
         conn.commit()
         return cursor.rowcount > 0
     except Exception as e:

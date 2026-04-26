@@ -34,7 +34,7 @@ try:
             latitude REAL,
             longitude REAL,
             status TEXT DEFAULT 'available' CHECK(status IN ('available', 'unavailable')),
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT (datetime('now', '+1 hours')),
             FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE CASCADE
         )
     """)

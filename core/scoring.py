@@ -35,6 +35,7 @@ from datetime import datetime
 from typing import Optional
 
 from utils.constants import WEIGHT_TEMP, WEIGHT_HUMID
+from utils.helpers import get_current_time
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -507,7 +508,7 @@ def generer_conseil(score_global: float,
             action = "📊 Maintenir la surveillance des deux axes — révision recommandée dans 30 jours."
 
     # ── Alerte saisonnière contextuelle ──────────────────────────────────────
-    mois = mois_courant or datetime.now().month
+    mois = mois_courant or get_current_time().month
     saison = get_saison(mois)
     norme = NORMES_SAISONNIERES.get(mois, NORMES_SAISONNIERES[6])
 

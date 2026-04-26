@@ -1,4 +1,5 @@
 import streamlit as st
+import re
 
 # =====================================================
 # Configuration de la page
@@ -10,7 +11,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# CSS léger (équivalent Tailwind)
+# CSS
 # =====================================================
 st.markdown("""
 <style>
@@ -50,6 +51,32 @@ body {
     max-width: 420px;
 }
 
+/* Règles de mot de passe */
+.pwd-rules {
+    background: #f0f7ff;
+    border-left: 4px solid #005da7;
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    margin: 8px 0 12px 0;
+    font-size: 13px;
+    color: #334155;
+}
+.pwd-rules ul {
+    margin: 6px 0 0 0;
+    padding-left: 18px;
+}
+.pwd-rules ul li { margin-bottom: 3px; }
+
+/* Indicateur de force */
+.strength-bar {
+    height: 6px;
+    border-radius: 3px;
+    margin: 6px 0;
+    transition: width 0.3s ease;
+}
+.rule-ok   { color: #16a34a; font-weight: 600; }
+.rule-fail { color: #dc2626; font-weight: 600; }
+
 .footer {
     margin-top: 48px;
     padding: 24px;
@@ -62,6 +89,60 @@ body {
 """, unsafe_allow_html=True)
 
 # =====================================================
+# Fonctions de validation
+# =====================================================
+def validate_email(email: str) -> tuple[bool, str]:
+    """
+    Valide le format d'une adresse e-mail selon RFC 5322 simplifié.
+    Exige: local@domaine.extension (extension ≥ 2 chars)
+    """
+    pattern = r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$'
+    if not email:
+        return False, "L'adresse e-mail est obligatoire."
+    if not re.match(pattern, email):
+        return False, "Format invalide. Exemple attendu : nom@entreprise.com"
+    if email.count('@') != 1:
+        return False, "L'adresse ne doit contenir qu'un seul '@'."
+    local, domain = email.split('@')
+    if len(local) < 1:
+        return False, "La partie locale (avant @) est vide."
+    if '.' not in domain:
+        return False, "Le domaine doit contenir un point (ex: entreprise.com)."
+    return True, "✅ Format e-mail valide."
+
+
+def check_password_rules(pwd: str) -> dict:
+    """
+    Vérifie chaque règle de robustesse du mot de passe.
+    Retourne un dict {règle: bool}.
+    """
+    return {
+        "8 caractères minimum":          len(pwd) >= 8,
+        "Au moins une MAJUSCULE (A-Z)":  bool(re.search(r'[A-Z]', pwd)),
+        "Au moins une minuscule (a-z)":  bool(re.search(r'[a-z]', pwd)),
+        "Au moins un chiffre (0-9)":     bool(re.search(r'\d', pwd)),
+        "Au moins un caractère spécial (!@#$%^&*…)": bool(re.search(r'[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]', pwd)),
+        "Pas d'espace":                  ' ' not in pwd,
+    }
+
+
+def password_strength(rules: dict) -> tuple[int, str, str]:
+    """
+    Retourne (score 0-6, label, couleur CSS).
+    """
+    score = sum(rules.values())
+    if score <= 2:
+        return score, "Très faible", "#dc2626"
+    if score == 3:
+        return score, "Faible", "#f97316"
+    if score == 4:
+        return score, "Moyen", "#eab308"
+    if score == 5:
+        return score, "Fort", "#22c55e"
+    return score, "Très fort 🔒", "#16a34a"
+
+
+# =====================================================
 # Header
 # =====================================================
 st.markdown("""
@@ -70,13 +151,11 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Espace sous le header fixe
 st.markdown("<div style='height:90px'></div>", unsafe_allow_html=True)
 
 # =====================================================
-# Carte d'inscription (Format Desktop)
+# Mise en page
 # =====================================================
-st.write("") # Espacement vertical
 col_img, col_form = st.columns([1.2, 1], gap="large")
 
 with col_img:
@@ -93,63 +172,124 @@ with col_form:
 
     st.markdown("## 📝 Créer un compte")
     st.caption("Rejoignez OptiStock Logistics Intelligence")
-
     st.write("")
 
-    nom = st.text_input(
-        "Nom complet",
-        placeholder="Votre nom"
-    )
+    # ── Nom complet ──────────────────────────────────
+    nom = st.text_input("Nom complet", placeholder="Prénom Nom")
 
-    email = st.text_input(
-        "Adresse e-mail",
-        placeholder="nom@entreprise.com"
-    )
+    # ── E-mail avec validation en temps réel ─────────
+    email = st.text_input("Adresse e-mail", placeholder="nom@entreprise.com")
 
+    if email:
+        email_ok, email_msg = validate_email(email)
+        if email_ok:
+            st.success(email_msg)
+        else:
+            st.error(f"❌ {email_msg}")
+    else:
+        st.caption("📧 Format attendu : **nom@domaine.extension** (ex: jean.dupont@optistock.com)")
+
+    # ── Rôle ─────────────────────────────────────────
     role = st.selectbox(
         "Sélectionnez votre profil",
         options=["Propriétaire d'entrepôt", "Chercheur d'entrepôt"]
     )
 
-    password = st.text_input(
-        "Mot de passe",
-        type="password",
-        placeholder="••••••••"
-    )
+    # ── Mot de passe ─────────────────────────────────
+    st.markdown("""
+<div class="pwd-rules">
+    <strong>🔐 Exigences du mot de passe</strong>
+    <ul>
+        <li>8 caractères minimum</li>
+        <li>Au moins une lettre MAJUSCULE</li>
+        <li>Au moins une lettre minuscule</li>
+        <li>Au moins un chiffre (0-9)</li>
+        <li>Au moins un caractère spécial : <code>! @ # $ % ^ &amp; * _ - + =</code></li>
+        <li>Aucun espace autorisé</li>
+    </ul>
+</div>
+""", unsafe_allow_html=True)
 
-    password_confirm = st.text_input(
-        "Confirmer le mot de passe",
-        type="password",
-        placeholder="••••••••"
-    )
+    password = st.text_input("Mot de passe", type="password", placeholder="••••••••")
 
-    if st.button("🚀 S'inscrire", use_container_width=True):
-        if not nom or not email or not password or not password_confirm:
-            st.error("Veuillez remplir tous les champs")
-        elif password != password_confirm:
-            st.error("Les mots de passe ne correspondent pas")
+    # Indicateur de force en temps réel
+    if password:
+        rules = check_password_rules(password)
+        score, label, color = password_strength(rules)
+        pct = int(score / 6 * 100)
+
+        st.markdown(f"""
+<div style="margin-bottom:4px; font-size:13px; color:{color}; font-weight:700;">
+    Force : {label} ({score}/6)
+</div>
+<div style="background:#e2e8f0; border-radius:3px; height:6px;">
+    <div style="width:{pct}%; background:{color}; height:6px; border-radius:3px; transition:width .3s;"></div>
+</div>
+""", unsafe_allow_html=True)
+
+        # Détail de chaque règle
+        with st.expander("Détail des règles", expanded=(score < 6)):
+            for rule, ok in rules.items():
+                icon = "✅" if ok else "❌"
+                css  = "rule-ok" if ok else "rule-fail"
+                st.markdown(f'<span class="{css}">{icon} {rule}</span>', unsafe_allow_html=True)
+
+    password_confirm = st.text_input("Confirmer le mot de passe", type="password", placeholder="••••••••")
+
+    # Vérification correspondance en temps réel
+    if password and password_confirm:
+        if password == password_confirm:
+            st.success("✅ Les mots de passe correspondent.")
+        else:
+            st.error("❌ Les mots de passe ne correspondent pas.")
+
+    st.write("")
+
+    # ── Bouton S'inscrire ─────────────────────────────
+    if st.button("🚀 S'inscrire", use_container_width=True, type="primary"):
+        errors = []
+
+        if not nom or not nom.strip():
+            errors.append("Le nom complet est obligatoire.")
+
+        email_ok, email_msg = validate_email(email)
+        if not email_ok:
+            errors.append(f"E-mail : {email_msg}")
+
+        if not password:
+            errors.append("Le mot de passe est obligatoire.")
+        else:
+            rules = check_password_rules(password)
+            failed = [r for r, ok in rules.items() if not ok]
+            if failed:
+                errors.append("Mot de passe trop faible — règles non respectées : " + ", ".join(failed))
+
+        if password and password_confirm and password != password_confirm:
+            errors.append("Les mots de passe ne correspondent pas.")
+
+        if errors:
+            for e in errors:
+                st.error(f"❌ {e}")
         else:
             role_map = {
                 "Propriétaire d'entrepôt": "owner",
-                "Chercheur d'entrepôt": "researcher",
-                "Administrateur": "admin"
+                "Chercheur d'entrepôt":    "researcher",
             }
             db_role = role_map.get(role, "owner")
-            
-            parts = nom.split(" ", 1)
+
+            parts      = nom.strip().split(" ", 1)
             first_name = parts[0]
-            last_name = parts[1] if len(parts) > 1 else ""
-            
+            last_name  = parts[1] if len(parts) > 1 else ""
+
             from core.auth import create_user
             success = create_user(db_role, first_name, last_name, email, password)
             if success:
                 st.success("✅ Compte créé avec succès !")
                 st.info("Vous pouvez maintenant vous connecter.")
             else:
-                st.error("Erreur : Adresse e-mail déjà utilisée ou problème serveur.")
+                st.error("❌ Adresse e-mail déjà utilisée ou problème serveur.")
 
     st.markdown("---")
-    
     st.write("Vous avez déjà un compte ?")
     if st.button("Se connecter", use_container_width=True):
         st.switch_page("pages/1_Login.py")
@@ -161,7 +301,7 @@ with col_form:
 # =====================================================
 st.markdown("""
 <div class="footer">
-    © 2024 OptiStock Logistics Intelligence — Tous droits réservés<br/>
+    © 2025 OptiStock Logistics Intelligence — Tous droits réservés<br/>
     <a href="#">Politique de confidentialité</a> •
     <a href="#">Conditions d'utilisation</a> •
     <a href="#">Support</a>

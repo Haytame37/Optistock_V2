@@ -39,8 +39,8 @@ def create_database():
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             is_active INTEGER DEFAULT 1 CHECK(is_active IN (0, 1)),
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at DATETIME DEFAULT (datetime('now', '+1 hours')),
+            updated_at DATETIME DEFAULT (datetime('now', '+1 hours'))
         )
     ''')
 
@@ -55,7 +55,7 @@ def create_database():
             latitude REAL,
             longitude REAL,
             status TEXT DEFAULT 'available' CHECK(status IN ('available', 'unavailable')),
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT (datetime('now', '+1 hours')),
             FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE SET NULL
         )
     ''')
@@ -95,8 +95,8 @@ def create_database():
             global_score REAL,
             status TEXT DEFAULT 'pending' CHECK(status IN ('pre_lock', 'pending', 'confirmed', 'canceled')),
             reason TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME DEFAULT (datetime('now', '+1 hours')),
+            updated_at DATETIME DEFAULT (datetime('now', '+1 hours')),
             expires_at DATETIME,
             FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id) ON DELETE CASCADE,
             FOREIGN KEY (researcher_id) REFERENCES users(user_id) ON DELETE CASCADE

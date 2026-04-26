@@ -4,6 +4,7 @@ import pandas as pd
 from utils.db import load_sql_to_dataframe, execute_query, get_db_connection
 from models.reservation import Reservation
 from core.auth import hash_password
+from utils.helpers import get_current_time
 
 # =====================================================
 # Configuration de la page
@@ -245,10 +246,11 @@ def render_users_page():
             if st.form_submit_button("Créer l'utilisateur", type="primary"):
                 if first_name and last_name and email and password:
                     hashed_pw = hash_password(password)
+                    now_str = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
                     try:
                         execute_query(
-                            "INSERT INTO users (role, first_name, last_name, email, password_hash, is_active) VALUES (?, ?, ?, ?, ?, 1)",
-                            (role, first_name, last_name, email, hashed_pw)
+                            "INSERT INTO users (role, first_name, last_name, email, password_hash, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
+                            (role, first_name, last_name, email, hashed_pw, now_str, now_str)
                         )
                         st.success("Utilisateur créé !")
                         st.rerun()

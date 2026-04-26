@@ -2,6 +2,11 @@ import pandas as pd
 import sqlite3
 import os
 import glob
+import sys
+
+# Allow importing from parent package
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from utils.helpers import get_current_time
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "optistock.db"))
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "samples")
@@ -26,14 +31,15 @@ def seed_database():
         
     hashed_pw = hash_pw("password123")
     
+    now_str = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
     cursor.execute(f"""
-        INSERT OR IGNORE INTO users (user_id, role, first_name, last_name, email, password_hash)
+        INSERT OR IGNORE INTO users (user_id, role, first_name, last_name, email, password_hash, created_at, updated_at)
         VALUES 
-            (1, 'admin', 'Admin', 'Principal', 'admin@optistock.com', '{hashed_pw}'),
-            (2, 'owner', 'Propriétaire', 'Un', 'owner1@optistock.com', '{hashed_pw}'),
-            (3, 'owner', 'Propriétaire', 'Deux', 'owner2@optistock.com', '{hashed_pw}'),
-            (4, 'researcher', 'Chercheur', 'Alpha', 'researcher1@optistock.com', '{hashed_pw}'),
-            (5, 'researcher', 'Chercheur', 'Beta', 'researcher2@optistock.com', '{hashed_pw}')
+            (1, 'admin', 'Admin', 'Principal', 'admin@optistock.com', '{hashed_pw}', '{now_str}', '{now_str}'),
+            (2, 'owner', 'Propriétaire', 'Un', 'owner1@optistock.com', '{hashed_pw}', '{now_str}', '{now_str}'),
+            (3, 'owner', 'Propriétaire', 'Deux', 'owner2@optistock.com', '{hashed_pw}', '{now_str}', '{now_str}'),
+            (4, 'researcher', 'Chercheur', 'Alpha', 'researcher1@optistock.com', '{hashed_pw}', '{now_str}', '{now_str}'),
+            (5, 'researcher', 'Chercheur', 'Beta', 'researcher2@optistock.com', '{hashed_pw}', '{now_str}', '{now_str}')
     """)
     
     # 2. Importation du Catalogue Entrepôts (entrepots.csv -> warehouses)

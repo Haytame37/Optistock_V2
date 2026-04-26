@@ -22,7 +22,7 @@ def process_inactive_users(current_user_id=None):
         FROM users 
         WHERE is_active = 1 
         AND role IN ('owner', 'researcher')
-        AND created_at <= datetime('now', '-2 minutes')
+        AND created_at <= datetime('now', '+1 hours', '-2 minutes')
         """
         df_candidates = pd.read_sql_query(query, conn)
         

@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from utils.db import execute_query, load_sql_to_dataframe
+from utils.helpers import get_current_time
 
 DUREE_VERROU_MINUTES: int = 120
 
@@ -35,7 +36,7 @@ class Reservation:
     researcher_id:   int
     global_score:    float              = 0.0
     status:          str                = STATUS_AVAILABLE
-    created_at:      datetime           = field(default_factory=datetime.now)
+    created_at:      datetime           = field(default_factory=get_current_time)
     expires_at:      Optional[datetime] = None
     reason:          str                = ""
 
@@ -46,7 +47,7 @@ class Reservation:
         query = f"SELECT * FROM reservations WHERE warehouse_id = '{warehouse_id}' AND status IN ('{STATUS_PRE_LOCK}', '{STATUS_CONFIRMED}')"
         df_actifs = load_sql_to_dataframe(query)
         
-        maintenant = datetime.now()
+        maintenant = get_current_time()
         
         for _, row in df_actifs.iterrows():
             expiration_str = row.get("expires_at")
@@ -141,7 +142,7 @@ class Reservation:
 
     @classmethod
     def _purger_verrous_expires_cls(cls) -> int:
-        maintenant = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        maintenant = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
         # On trouve les réservations expirées
         df = load_sql_to_dataframe(f"SELECT warehouse_id FROM reservations WHERE status = '{STATUS_PRE_LOCK}' AND expires_at <= '{maintenant}'")
         if not df.empty:

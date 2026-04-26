@@ -156,7 +156,7 @@ with col_form:
 # =====================================================
 st.markdown("""
 <div class="footer">
-    © 2024 OptiStock Logistics Intelligence — Tous droits réservés<br/>
+    © 2026 OptiStock Logistics Intelligence — Tous droits réservés<br/>
     <a href="#">Politique de confidentialité</a> •
     <a href="#">Conditions d'utilisation</a> •
     <a href="#">Support</a>
