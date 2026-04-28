@@ -11,24 +11,20 @@ Les temps sont exprimés en heures pour faciliter les calculs avec les historiqu
 PRODUCT_CONDITIONS = {
     "Tomates": {
         "temperature": {
-            "min": 10.0,
-            "max": 15.0,
-            "marge_bas": -2.0,  # Seuil critique < 8.0
-            "marge_haut": 3.0,  # Seuil critique > 18.0
+            "min": 7.0,
+            "max": 10.0,
+            "marge_bas": -1.5,  # Seuil critique < 5.5
+            "marge_haut": 1.5,  # Seuil critique > 11.5
             "temps_resistance_bas_min_h": 2.0,
-            "temps_resistance_bas_h": 4.0,
-            "temps_resistance_haut_min_h": 12.0,
-            "temps_resistance_haut_h": 24.0
+            "temps_resistance_haut_min_h": 12.0
         },
         "humidite": {
-            "min": 85.0,
-            "max": 90.0,
-            "marge_bas": -5.0,
-            "marge_haut": 5.0,
+            "min": 90.0,
+            "max": 95.0,
+            "marge_bas": -1,
+            "marge_haut": 1,
             "temps_resistance_bas_min_h": 72.0,
-            "temps_resistance_bas_h": 120.0,
-            "temps_resistance_haut_min_h": 48.0,
-            "temps_resistance_haut_h": 72.0
+            "temps_resistance_haut_min_h": 48.0
         }
     },
     "Produits Laitiers": {
