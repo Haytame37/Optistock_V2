@@ -156,7 +156,7 @@ st.image("https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=20
 
 # --- Bottom Navigation / Actions ---
 st.markdown("---")
-col_login, col_signup = st.columns(2)
+col_login, col_signup, col_lab = st.columns(3)
 
 with col_login:
     st.markdown('<div class="btn-login">', unsafe_allow_html=True)
@@ -168,4 +168,10 @@ with col_signup:
     st.markdown('<div class="btn-signup">', unsafe_allow_html=True)
     if st.button("Voir la démo"):
         st.success("Bienvenue à bord !")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col_lab:
+    st.markdown('<div class="btn-signup">', unsafe_allow_html=True)
+    if st.button("Laboratoire d'Optimisation 🚀"):
+        st.switch_page("pages/6_Optimization_Lab.py")
     st.markdown('</div>', unsafe_allow_html=True)
