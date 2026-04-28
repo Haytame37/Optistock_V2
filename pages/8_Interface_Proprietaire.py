@@ -131,7 +131,7 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
     if st.button("Accéder à la liste ➜", key="manage"):
-        st.switch_page("pages/Liste_Entrepots.py")
+        st.switch_page("pages/5_Liste_Entrepots.py")
 
 with col2:
     st.markdown("""
@@ -143,7 +143,7 @@ with col2:
     </div>
     """, unsafe_allow_html=True)
     if st.button("Démarrer la configuration ➜", key="add"):
-        st.switch_page("pages/Ajout_Entrepot.py")
+        st.switch_page("pages/6_Ajout_Entrepot.py")
 
 st.write("")
 
