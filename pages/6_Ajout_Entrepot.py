@@ -72,7 +72,7 @@ st.markdown(f"""
 
 st.write("")
 if st.button("⬅ Retour au tableau de bord", key="back_btn"):
-    st.switch_page("pages/4_Interface_Proprietaire.py")
+    st.switch_page("pages/8_Interface_Proprietaire.py")
 
 st.write("")
 
@@ -187,7 +187,7 @@ c1, c2, c3 = st.columns([2, 2, 6])
 
 with c1:
     if st.button("❌ Annuler"):
-        st.switch_page("pages/4_Interface_Proprietaire.py")
+        st.switch_page("pages/8_Interface_Proprietaire.py")
 
 with c2:
     if st.button("🚀 Enregistrer & Activer"):

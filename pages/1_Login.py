@@ -130,11 +130,11 @@ with col_form:
                     st.session_state['logged_in'] = True
                     
                     if user['role'] == 'admin':
-                        st.switch_page("pages/2_Dashboard_Admin.py")
+                        st.switch_page("pages/3_Dashboard_Admin.py")
                     elif user['role'] == 'researcher':
-                        st.switch_page("pages/3_Interface_Chercheur.py")
+                        st.switch_page("pages/9_Interface_Chercheur.py")
                     elif user['role'] == 'owner':
-                        st.switch_page("pages/4_Interface_Proprietaire.py")
+                        st.switch_page("pages/8_Interface_Proprietaire.py")
             else:
                 st.error("❌ Identifiants incorrects.")
 
@@ -144,7 +144,7 @@ with col_form:
         st.markdown("<p style='margin-top: 8px;'>Pas encore de compte ?</p>", unsafe_allow_html=True)
     with col2:
         if st.button("Créer un compte", use_container_width=True):
-            st.switch_page("pages/Signup.py")
+            st.switch_page("pages/2_Signup.py")
 
     st.markdown("</div>", unsafe_allow_html=True)
 

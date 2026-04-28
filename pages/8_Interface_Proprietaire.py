@@ -131,7 +131,7 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
     if st.button("Accéder à la liste ➜", key="manage"):
-        st.switch_page("pages/Liste_Entrepots.py")
+        st.switch_page("pages/5_Liste_Entrepots.py")
 
 with col2:
     st.markdown("""
@@ -143,7 +143,7 @@ with col2:
     </div>
     """, unsafe_allow_html=True)
     if st.button("Démarrer la configuration ➜", key="add"):
-        st.switch_page("pages/Ajout_Entrepot.py")
+        st.switch_page("pages/6_Ajout_Entrepot.py")
 
 st.write("")
 
@@ -176,9 +176,7 @@ else:
             <p class="small">🛰 GPS: {unit['gps']}</p>
         </div>
         """, unsafe_allow_html=True)
-if st.button("Se déconnecter", key="logout_btn"):
-    st.session_state.clear()
-    st.switch_page("pages/1_Login.py")
+
 
 st.divider()
 
@@ -241,6 +239,8 @@ else:
 </div>
 """, unsafe_allow_html=True)
 
-
+if st.button("Se déconnecter", key="logout_btn"):
+    st.session_state.clear()
+    st.switch_page("pages/1_Login.py")
 st.write("")
 st.caption("LogiTech Admin — Warehouse Monitoring Dashboard")

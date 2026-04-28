@@ -28,7 +28,7 @@ if st.session_state.get('user', {}).get('role') != 'owner':
 wh_id = st.session_state.get("edit_warehouse_id")
 if not wh_id:
     st.warning("⚠️ Aucun entrepôt sélectionné pour la modification.")
-    st.switch_page("pages/Liste_Entrepots.py")
+    st.switch_page("pages/5_Liste_Entrepots.py")
     st.stop()
 
 from core.auth import get_warehouse_by_id, update_warehouse
@@ -91,7 +91,7 @@ st.markdown(f"""
 
 st.write("")
 if st.button("⬅ Retour à la liste", key="back_btn"):
-    st.switch_page("pages/Liste_Entrepots.py")
+    st.switch_page("pages/5_Liste_Entrepots.py")
 
 st.write("")
 
@@ -208,7 +208,7 @@ c1, c2, c3 = st.columns([2, 2, 6])
 
 with c1:
     if st.button("❌ Annuler"):
-        st.switch_page("pages/Liste_Entrepots.py")
+        st.switch_page("pages/5_Liste_Entrepots.py")
 
 with c2:
     if st.button("💾 Enregistrer les modifications"):

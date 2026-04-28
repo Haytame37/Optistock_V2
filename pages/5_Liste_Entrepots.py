@@ -40,7 +40,7 @@ if st.session_state.get('redirect_to_edit'):
     w_id = st.session_state['redirect_to_edit']
     del st.session_state['redirect_to_edit']
     st.session_state['edit_warehouse_id'] = w_id
-    st.switch_page("pages/Modifier_Entrepot.py")
+    st.switch_page("pages/7_Modifier_Entrepot.py")
 
 if 'delete_toast' in st.session_state:
     st.toast(st.session_state['delete_toast'])
@@ -115,7 +115,7 @@ st.markdown(f"""
 
 st.write("")
 if st.button("⬅ Retour au tableau de bord", key="back_btn"):
-    st.switch_page("pages/4_Interface_Proprietaire.py")
+    st.switch_page("pages/8_Interface_Proprietaire.py")
 
 st.write("")
 
@@ -192,4 +192,4 @@ else:
 # -----------------------------
 st.write("")
 if st.button("➕ Ajouter un entrepôt"):
-    st.switch_page("pages/Ajout_Entrepot.py")
+    st.switch_page("pages/6_Ajout_Entrepot.py")
