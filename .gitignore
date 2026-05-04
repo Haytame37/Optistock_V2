@@ -18,9 +18,3 @@ ENV/
 .vscode/
 .DS_Store
 Thumbs.db
-
-# Assistant AI et fichiers temporaires
-.gemini/
-scratch/
-brain/
-artifacts/
