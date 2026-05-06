@@ -889,7 +889,6 @@ if current_view == "search":
                         "type_stockage",
                         "score_logistique",
                         "distance_km",
-                        "taux_conf",
                         "avg_temp",
                         "avg_hum",
                         "status",
@@ -903,7 +902,6 @@ if current_view == "search":
                         "type_stockage": "Type logistique",
                         "score_logistique": st.column_config.NumberColumn("Score logistique", format="%.2f"),
                         "distance_km": st.column_config.NumberColumn("Distance (km)", format="%.2f"),
-                        "taux_conf": st.column_config.NumberColumn("Taux conformite", format="%.2f %%"),
                         "avg_temp": st.column_config.NumberColumn("Temperature moyenne", format="%.1f C"),
                         "avg_hum": st.column_config.NumberColumn("Humidite moyenne", format="%.1f %%"),
                         "status": "Statut",
@@ -979,7 +977,7 @@ elif current_view == "results":
             preferred_columns = [
                 c for c in [
                     "nom", "type_stockage", "score_logistique", "distance_km", 
-                    "taux_conf", "avg_temp", "avg_hum", "status"
+                    "avg_temp", "avg_hum", "status"
                 ] if c in df_results.columns
             ]
             st.dataframe(df_results[preferred_columns], use_container_width=True, hide_index=True)

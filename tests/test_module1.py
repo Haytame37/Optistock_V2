@@ -1,4 +1,4 @@
-from core.logistique import haversine, calculer_score_mixte
+from core.logistique import haversine, score_distance
 
 # --- ÉTAPE 1 : IMPORTATION DES DONNÉES (Catalogue fictif) ---
 entrepots_catalogue = [
@@ -12,13 +12,6 @@ entrepots_catalogue = [
 client_gps = (33.58, -7.60) # Coordonnées du point de livraison (ex: Casablanca Centre)
 type_requis = "Froid"       # Contrainte spécifique
 
-# Le client choisit ses priorités (doit totaliser 1.0)
-poids_client = {
-    'dist': 0.5,  # 50% d'importance pour la proximité
-    'temp': 0.3,  # 30% pour la stabilité thermique
-    'hum': 0.2    # 20% pour l'humidité
-}
-
 print(f"--- ANALYSE POUR : Type {type_requis} | Point de livraison {client_gps} ---")
 
 # --- ÉTAPE 3 : CALCULS ET FILTRAGE ---
@@ -30,8 +23,8 @@ for e in entrepots_catalogue:
         # Calcul Haversine
         distance_km = haversine(client_gps[0], client_gps[1], e['lat'], e['lon'])
         
-        # Calcul du Score Mixte
-        score = calculer_score_mixte(distance_km, e['t_ok'], e['h_ok'], poids_client)
+        # Calcul du Score Logistique
+        score = score_distance(distance_km)
         
         resultats_finaux.append({
             "nom": e['nom'],
@@ -46,4 +39,4 @@ classement = sorted(resultats_finaux, key=lambda x: x['score'], reverse=True)
 print(f"{'Rang':<5} | {'Nom':<20} | {'Distance':<10} | {'Score/100':<10} | {'Détails IoT'}")
 print("-" * 70)
 for i, res in enumerate(classement, 1):
-    print(f"{i:<5} | {res['nom']:<20} | {res['distance']:<7} km | {res['score']:<10} | {res['iot_status']}")
+    print(f"{i:<5} | {res['nom']:<20} | {res['distance']:<7} km | {res['score']:<10} | {res['iot_status']}")

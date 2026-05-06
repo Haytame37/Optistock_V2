@@ -2,28 +2,8 @@ import pandas as pd
 import numpy as np
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  SEUILS DE CONFORMITÉ LOGISTIQUE PAR TYPE DE STOCKAGE
-#  Référence : Normes HACCP / GDP (Good Distribution Practice)
+#  PARAMÈTRES LOGISTIQUES
 # ══════════════════════════════════════════════════════════════════════════════
-
-SEUILS_CONFORMITE = {
-    "froid": {
-        "temp_min": 2.0,   "temp_max": 8.0,    # Chaîne du froid pharmaceutique/alimentaire
-        "hum_min": 65.0,   "hum_max": 95.0,
-        "temp_ideale": 4.0, "hum_ideale": 80.0,
-    },
-    "sec": {
-        "temp_min": 15.0,  "temp_max": 30.0,    # Stockage ambiant contrôlé
-        "hum_min": 30.0,   "hum_max": 60.0,
-        "temp_ideale": 22.0, "hum_ideale": 45.0,
-    },
-    "mixte": {
-        "temp_min": 5.0,   "temp_max": 25.0,    # Zone polyvalente
-        "hum_min": 40.0,   "hum_max": 80.0,
-        "temp_ideale": 15.0, "hum_ideale": 60.0,
-    },
-}
-
 # Distance de référence pour la normalisation (km)
 # Correspond à la plus grande distance logistique courante au Maroc (Tanger → Dakhla ≈ 1800 km)
 DISTANCE_REF_KM = 1500.0
@@ -96,125 +76,6 @@ def score_distance(distance_km, d_ref=DISTANCE_REF_KM):
     """
     return round(100 * np.exp(-distance_km / d_ref), 2)
 
-
-def score_conformite_temperature(temp_moyenne, type_stockage):
-    """
-    Calcule un score de conformité thermique [0, 100] adapté au type de stockage.
-    
-    Logique : Plus la température moyenne est proche de la valeur idéale
-    pour le type de stockage, plus le score est élevé.
-    
-    - Dans la plage [min, max] → score entre 50 et 100 (proportionnel à la proximité de l'idéale)
-    - Hors plage → score entre 0 et 50 (pénalité proportionnelle à l'écart)
-    """
-    seuils = SEUILS_CONFORMITE.get(type_stockage, SEUILS_CONFORMITE["mixte"])
-    t_min, t_max = seuils["temp_min"], seuils["temp_max"]
-    t_ideale = seuils["temp_ideale"]
-    
-    if t_min <= temp_moyenne <= t_max:
-        # Dans la plage → score 50-100
-        ecart = abs(temp_moyenne - t_ideale)
-        amplitude = max(t_ideale - t_min, t_max - t_ideale)
-        if amplitude == 0:
-            return 100.0
-        score = 100 - (ecart / amplitude) * 50
-        return round(max(50, score), 2)
-    else:
-        # Hors plage → score 0-50
-        if temp_moyenne < t_min:
-            ecart = t_min - temp_moyenne
-        else:
-            ecart = temp_moyenne - t_max
-        # Pénalité : chaque degré hors plage coûte ~5 points
-        score = max(0, 50 - ecart * 5)
-        return round(score, 2)
-
-
-def score_conformite_humidite(hum_moyenne, type_stockage):
-    """
-    Calcule un score de conformité humidité [0, 100] adapté au type de stockage.
-    Même logique que la température.
-    """
-    seuils = SEUILS_CONFORMITE.get(type_stockage, SEUILS_CONFORMITE["mixte"])
-    h_min, h_max = seuils["hum_min"], seuils["hum_max"]
-    h_ideale = seuils["hum_ideale"]
-    
-    if h_min <= hum_moyenne <= h_max:
-        ecart = abs(hum_moyenne - h_ideale)
-        amplitude = max(h_ideale - h_min, h_max - h_ideale)
-        if amplitude == 0:
-            return 100.0
-        score = 100 - (ecart / amplitude) * 50
-        return round(max(50, score), 2)
-    else:
-        if hum_moyenne < h_min:
-            ecart = h_min - hum_moyenne
-        else:
-            ecart = hum_moyenne - h_max
-        score = max(0, 50 - ecart * 2)
-        return round(score, 2)
-
-
-def calculer_taux_conformite_iot(df_temp_entrepot, df_humid_entrepot, type_stockage):
-    """
-    Calcule les métriques de conformité IoT à partir des relevés bruts d'un entrepôt.
-    Moyenne des 3 capteurs pour chaque horodatage.
-    """
-    seuils = SEUILS_CONFORMITE.get(type_stockage, SEUILS_CONFORMITE["mixte"])
-    
-    # Moyenne par ligne (sur les 3 capteurs)
-    t_avg = df_temp_entrepot[['capteur1', 'capteur2', 'capteur3']].mean(axis=1)
-    h_avg = df_humid_entrepot[['capteur1', 'capteur2', 'capteur3']].mean(axis=1)
-    
-    temp_moy = t_avg.mean()
-    hum_moy = h_avg.mean()
-    
-    # Taux de conformité = % de relevés dans la plage acceptable
-    conforme_temp = (
-        (t_avg >= seuils['temp_min']) & 
-        (t_avg <= seuils['temp_max'])
-    ).mean() * 100
-    
-    conforme_hum = (
-        (h_avg >= seuils['hum_min']) & 
-        (h_avg <= seuils['hum_max'])
-    ).mean() * 100
-    
-    # Score combiné : pondération taux_conformité (60%) + proximité_ideale (40%)
-    score_temp = round(conforme_temp * 0.6 + score_conformite_temperature(temp_moy, type_stockage) * 0.4, 2)
-    score_hum = round(conforme_hum * 0.6 + score_conformite_humidite(hum_moy, type_stockage) * 0.4, 2)
-    taux_global = round((conforme_temp + conforme_hum) / 2, 2)
-    
-    return {
-        "score_temp": score_temp,
-        "score_hum": score_hum,
-        "taux_conf": taux_global,
-        "temp_moy": round(temp_moy, 2),
-        "hum_moy": round(hum_moy, 2),
-    }
-
-
-def calculer_score_mixte(distance, score_temp, score_hum, poids, score_capacite=100):
-    """
-    Calcule le score final pondéré. 
-    TOUS les composants sont maintenant normalisés sur [0, 100].
-    
-    Formule : S = Σ(Ci × Wi) avec Ci ∈ [0, 100] et ΣWi = 1
-    
-    Arguments :
-    - distance    : Distance en km (sera convertie en score via score_distance)
-    - score_temp  : Score conformité temp [0,100] (déjà normalisé)
-    - score_hum   : Score conformité hum [0,100] (déjà normalisé)
-    - poids       : Dict {'dist': float, 'temp': float, 'hum': float}
-    - score_capacite : Score de capacité [0,100] (100 = largement disponible)
-    """
-    s_dist = score_distance(distance)
-    
-    score = (s_dist * poids.get('dist', 0.5)) + \
-            (score_temp * poids.get('temp', 0.3)) + \
-            (score_hum * poids.get('hum', 0.2))
-    
-    return round(score, 2)
 
 
 def compatibilite_type_stockage(type_entrepot, type_requis):

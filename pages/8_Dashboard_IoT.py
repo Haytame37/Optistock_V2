@@ -2,7 +2,6 @@ import streamlit as st
 import time
 from datetime import timedelta
 from utils.db import load_sql_to_dataframe
-from core.scoring import pretraiter_serie_capteurs
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from utils.product_conditions import PRODUCT_CONDITIONS
@@ -119,9 +118,12 @@ if df_rt.empty:
 cols_t = ["temp_sensor_1", "temp_sensor_2", "temp_sensor_3"]
 cols_h = ["hum_sensor_1", "hum_sensor_2", "hum_sensor_3"]
 
-df_rt = pretraiter_serie_capteurs(df_rt, colonnes=cols_t + cols_h)
-df_rt["T"] = df_rt[cols_t].median(axis=1)
-df_rt["H"] = df_rt[cols_h].median(axis=1)
+for col in cols_t + cols_h:
+    df_rt[col] = df_rt[col].interpolate(method='linear', limit_direction='both')
+    df_rt[col] = df_rt[col].rolling(window=3, min_periods=1).mean()
+
+df_rt["T"] = df_rt[cols_t].mean(axis=1)
+df_rt["H"] = df_rt[cols_h].mean(axis=1)
 
 max_idx = len(df_rt) - 1
 idx = min(st.session_state.rt_index, max_idx)

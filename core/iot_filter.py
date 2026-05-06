@@ -1,6 +1,6 @@
 import pandas as pd
 
-from core.logistique import calculer_score_mixte, calculer_taux_conformite_iot, haversine
+from core.logistique import haversine
 from utils.db import get_db_connection
 from utils.product_conditions import (
     PRODUCT_CONDITIONS,
@@ -101,53 +101,18 @@ def get_compliant_warehouses(product_name, researcher_id=None):
         if not (temp_ok and hum_ok):
             continue
 
-        df_temp_entrepot = df_iot.rename(
-            columns={
-                "temp_sensor_1": "capteur1",
-                "temp_sensor_2": "capteur2",
-                "temp_sensor_3": "capteur3",
-            }
-        )[["capteur1", "capteur2", "capteur3"]]
-
-        df_humid_entrepot = df_iot.rename(
-            columns={
-                "hum_sensor_1": "capteur1",
-                "hum_sensor_2": "capteur2",
-                "hum_sensor_3": "capteur3",
-            }
-        )[["capteur1", "capteur2", "capteur3"]]
-
-        if ignore_environment:
-            iot_metrics = {
-                "score_temp": 100.0,
-                "score_hum": 100.0,
-                "taux_conf": 100.0,
-                "temp_moy": round(avg_temp, 2),
-                "hum_moy": round(avg_hum, 2),
-            }
-        else:
-            iot_metrics = calculer_taux_conformite_iot(
-                df_temp_entrepot=df_temp_entrepot,
-                df_humid_entrepot=df_humid_entrepot,
-                type_stockage=type_stockage,
-            )
-
         distance_km = None
-        score_logistique = round((iot_metrics["score_temp"] + iot_metrics["score_hum"]) / 2, 2)
+        score_logistique = 100.0
 
         if delivery_center is not None:
+            from core.logistique import score_distance
             distance_km = haversine(
                 delivery_center[0],
                 delivery_center[1],
                 float(wh["latitude"]),
                 float(wh["longitude"]),
             )
-            score_logistique = calculer_score_mixte(
-                distance=distance_km,
-                score_temp=iot_metrics["score_temp"],
-                score_hum=iot_metrics["score_hum"],
-                poids={"dist": 0.5, "temp": 0.25, "hum": 0.25},
-            )
+            score_logistique = score_distance(distance_km)
 
         compliant_list.append(
             {
@@ -162,9 +127,6 @@ def get_compliant_warehouses(product_name, researcher_id=None):
                 "longitude": wh["longitude"],
                 "status": wh["status"],
                 "type_stockage": type_stockage,
-                "taux_conf": float(iot_metrics["taux_conf"]),
-                "score_temp": float(iot_metrics["score_temp"]),
-                "score_hum": float(iot_metrics["score_hum"]),
                 "distance_km": round(float(distance_km), 2) if distance_km is not None else None,
                 "score_logistique": round(float(score_logistique), 2),
             }
