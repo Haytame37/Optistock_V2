@@ -98,6 +98,64 @@ def compatibilite_type_stockage(type_entrepot, type_requis):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  CLASSEMENT LOGISTIQUE POST-FILTRAGE
+# ══════════════════════════════════════════════════════════════════════════════
+
+def classer_entrepots_logistique(entrepots, researcher_id=None):
+    """
+    Prend une liste d'entrepots (déjà filtrés comme conformes), calcule leur
+    distance par rapport au centre de gravité des points de livraison du chercheur,
+    leur attribue un score logistique et les trie.
+    """
+    if not entrepots:
+        return []
+
+    delivery_center = None
+    if researcher_id:
+        from utils.db import get_db_connection
+        conn = get_db_connection()
+        df_points = pd.read_sql_query(
+            """
+            SELECT latitude, longitude
+            FROM delivery_points
+            WHERE researcher_id = ?
+              AND latitude IS NOT NULL
+              AND longitude IS NOT NULL
+            """,
+            conn,
+            params=(researcher_id,),
+        )
+        conn.close()
+        
+        if not df_points.empty:
+            delivery_center = (
+                float(df_points["latitude"].mean()),
+                float(df_points["longitude"].mean()),
+            )
+
+    results = []
+    for wh in entrepots:
+        wh_copy = wh.copy()
+        distance_km = None
+        score_logistique = 100.0
+
+        if delivery_center is not None:
+            distance_km = haversine(
+                delivery_center[0],
+                delivery_center[1],
+                float(wh["latitude"]),
+                float(wh["longitude"]),
+            )
+            score_logistique = score_distance(distance_km)
+
+        wh_copy["distance_km"] = round(float(distance_km), 2) if distance_km is not None else None
+        wh_copy["score_logistique"] = round(float(score_logistique), 2)
+        results.append(wh_copy)
+
+    return sorted(results, key=lambda item: item["score_logistique"], reverse=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  MODULE 2 : CENTRE DE GRAVITÉ ITÉRATIF (Weber)
 # ══════════════════════════════════════════════════════════════════════════════
 

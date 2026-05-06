@@ -9,16 +9,14 @@ from utils.product_conditions import (
 )
 
 
-def get_compliant_warehouses(product_name, researcher_id=None):
+def get_compliant_warehouses(product_name):
     """
     Retourne les entrepots proprietaires conformes au produit choisi,
-    puis les classe selon un score logistique calcule uniquement
-    sur cet ensemble conforme.
+    sans aucun calcul logistique.
 
     Etapes :
     1. Lire les entrepots de la base proprietaire (`warehouses`)
     2. Filtrer ceux qui sont conformes aux contraintes du produit
-    3. Appliquer le calcul logistique sur les entrepots conformes
     """
     conditions = PRODUCT_CONDITIONS.get(product_name)
     if not conditions:
@@ -38,24 +36,7 @@ def get_compliant_warehouses(product_name, researcher_id=None):
         conn,
     )
 
-    delivery_center = None
-    if researcher_id:
-        df_points = pd.read_sql_query(
-            """
-            SELECT latitude, longitude
-            FROM delivery_points
-            WHERE researcher_id = ?
-              AND latitude IS NOT NULL
-              AND longitude IS NOT NULL
-            """,
-            conn,
-            params=(researcher_id,),
-        )
-        if not df_points.empty:
-            delivery_center = (
-                float(df_points["latitude"].mean()),
-                float(df_points["longitude"].mean()),
-            )
+
 
     compliant_list = []
 
@@ -101,19 +82,6 @@ def get_compliant_warehouses(product_name, researcher_id=None):
         if not (temp_ok and hum_ok):
             continue
 
-        distance_km = None
-        score_logistique = 100.0
-
-        if delivery_center is not None:
-            from core.logistique import score_distance
-            distance_km = haversine(
-                delivery_center[0],
-                delivery_center[1],
-                float(wh["latitude"]),
-                float(wh["longitude"]),
-            )
-            score_logistique = score_distance(distance_km)
-
         compliant_list.append(
             {
                 "id": wh["warehouse_id"],
@@ -127,10 +95,8 @@ def get_compliant_warehouses(product_name, researcher_id=None):
                 "longitude": wh["longitude"],
                 "status": wh["status"],
                 "type_stockage": type_stockage,
-                "distance_km": round(float(distance_km), 2) if distance_km is not None else None,
-                "score_logistique": round(float(score_logistique), 2),
             }
         )
 
     conn.close()
-    return sorted(compliant_list, key=lambda item: item["score_logistique"], reverse=True)
+    return compliant_list

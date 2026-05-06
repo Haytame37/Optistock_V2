@@ -853,10 +853,11 @@ if current_view == "search":
                 saved_warehouses = 0
 
             with st.spinner("Analyse des historiques IoT en cours..."):
-                suggestions = get_compliant_warehouses(
-                    st.session_state["researcher_search_product"],
-                    researcher_id=researcher_id,
+                from core.logistique import classer_entrepots_logistique
+                compliant_warehouses = get_compliant_warehouses(
+                    st.session_state["researcher_search_product"]
                 )
+                suggestions = classer_entrepots_logistique(compliant_warehouses, researcher_id)
 
             st.session_state["researcher_last_search"] = {
                 "product": st.session_state["researcher_search_product"],
