@@ -74,7 +74,7 @@ st.markdown(f"""
 
 st.write("")
 if st.button("⬅ Retour au tableau de bord", key="back_btn"):
-    st.switch_page("pages/8_Interface_Proprietaire.py")
+    st.switch_page("pages/4_Interface_Proprietaire.py")
 
 st.write("")
 
@@ -189,7 +189,7 @@ c1, c2, c3 = st.columns([2, 2, 6])
 
 with c1:
     if st.button("❌ Annuler"):
-        st.switch_page("pages/8_Interface_Proprietaire.py")
+        st.switch_page("pages/4_Interface_Proprietaire.py")
 
 with c2:
     if st.button("🚀 Enregistrer & Activer"):
@@ -201,7 +201,7 @@ with c2:
                 lon_val = float(longitude)
                 vol_val = float(volume_total)
                 
-                from core.auth import add_warehouse
+                from core.warehouse_service import add_warehouse
                 owner_id = st.session_state['user']['user_id']
                 w_id = add_warehouse(owner_id, nom, adresse, vol_val, lat_val, lon_val)
                 
@@ -211,7 +211,7 @@ with c2:
                         import io
                         fichier_env.seek(0)
                         df_raw = pd.read_csv(io.BytesIO(fichier_env.read()))
-                        from core.auth import import_iot_csv
+                        from core.iot_service import import_iot_csv
                         ok, msg = import_iot_csv(w_id, df_raw)
                         if ok:
                             st.success(f"✅ Entrepôt enregistré ({w_id}) ! {msg}")

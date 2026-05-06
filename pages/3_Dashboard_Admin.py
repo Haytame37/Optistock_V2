@@ -247,17 +247,12 @@ def render_users_page():
             role = st.selectbox("Rôle", ["admin", "owner", "researcher"])
             if st.form_submit_button("Créer l'utilisateur", type="primary"):
                 if first_name and last_name and email and password:
-                    hashed_pw = hash_password(password)
-                    now_str = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
-                    try:
-                        execute_query(
-                            "INSERT INTO users (role, first_name, last_name, email, password_hash, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
-                            (role, first_name, last_name, email, hashed_pw, now_str, now_str)
-                        )
+                    from core.auth import create_user
+                    if create_user(role, first_name, last_name, email, password):
                         st.success("Utilisateur créé !")
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Erreur : {e}")
+                    else:
+                        st.error("Erreur lors de la création de l'utilisateur (l'email est peut-être déjà utilisé).")
                 else:
                     st.warning("Veuillez remplir tous les champs.")
 

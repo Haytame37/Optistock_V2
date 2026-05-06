@@ -193,7 +193,7 @@ st.markdown(f"""
 
 # Bouton retour
 if st.button("← Retour au tableau de bord", key="back_to_dashboard"):
-    st.switch_page("pages/8_Interface_Proprietaire.py")
+    st.switch_page("pages/4_Interface_Proprietaire.py")
 
 st.write("")
 

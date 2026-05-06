@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from core.auth import get_warehouses_by_owner
+from core.warehouse_service import get_warehouses_by_owner
 from utils.ui import hide_sidebar
 
 # =====================================================
@@ -29,7 +29,7 @@ if st.session_state.get('user', {}).get('role') != 'owner':
 user_name = st.session_state['user'].get('first_name', 'Propriétaire')
 
 def on_delete_click(w_id, w_name):
-    from core.auth import delete_warehouse
+    from core.warehouse_service import delete_warehouse
     if delete_warehouse(w_id):
         st.session_state['delete_toast'] = f"✅ {w_name} supprimé avec succès."
     else:
@@ -117,7 +117,7 @@ st.markdown(f"""
 
 st.write("")
 if st.button("⬅ Retour au tableau de bord", key="back_btn"):
-    st.switch_page("pages/8_Interface_Proprietaire.py")
+    st.switch_page("pages/4_Interface_Proprietaire.py")
 
 st.write("")
 

@@ -180,7 +180,7 @@ with col3:
         st.markdown(f'<h3 style="color:#1d4ed8; margin-top:0;">💬 Messagerie {_badge}</h3>', unsafe_allow_html=True)
         st.markdown('<p style="font-size:13px; color:#414751;">Gérez les demandes des chercheurs et échangez en temps réel avec eux.</p>', unsafe_allow_html=True)
         if st.button("💬 Ouvrir la messagerie ➜", key="goto_msg", use_container_width=True, type="primary"):
-            st.switch_page("pages/10_Messagerie_Proprietaire.py")
+            st.switch_page("pages/11_Messagerie_Proprietaire.py")
 
 st.write("")
 
@@ -189,7 +189,7 @@ st.write("")
 # =====================================================
 st.subheader("Unités récentes")
 
-from core.auth import get_recent_warehouses_by_owner
+from core.warehouse_service import get_recent_warehouses_by_owner
 recent_units = get_recent_warehouses_by_owner(owner_id, limit=3)
 
 if not recent_units:

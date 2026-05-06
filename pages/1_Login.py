@@ -148,7 +148,7 @@ with col_form:
                         elif user['role'] == 'researcher':
                             st.switch_page("pages/9_Interface_Chercheur.py")
                         elif user['role'] == 'owner':
-                            st.switch_page("pages/8_Interface_Proprietaire.py")
+                            st.switch_page("pages/4_Interface_Proprietaire.py")
 
                 else:
                     # Un seul compte → connexion directe
@@ -166,7 +166,7 @@ with col_form:
                         elif user['role'] == 'researcher':
                             st.switch_page("pages/9_Interface_Chercheur.py")
                         elif user['role'] == 'owner':
-                            st.switch_page("pages/8_Interface_Proprietaire.py")
+                            st.switch_page("pages/4_Interface_Proprietaire.py")
 
 
         st.markdown("---")

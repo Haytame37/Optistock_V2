@@ -33,7 +33,7 @@ if not wh_id:
     st.switch_page("pages/5_Liste_Entrepots.py")
     st.stop()
 
-from core.auth import get_warehouse_by_id, update_warehouse
+from core.warehouse_service import get_warehouse_by_id, update_warehouse
 wh_data = get_warehouse_by_id(wh_id)
 
 if not wh_data:
@@ -230,7 +230,7 @@ with c2:
                         import io
                         fichier_env.seek(0)
                         df_raw = pd.read_csv(io.BytesIO(fichier_env.read()))
-                        from core.auth import import_iot_csv
+                        from core.iot_service import import_iot_csv
                         ok, msg = import_iot_csv(wh_id, df_raw)
                         if ok:
                             st.success(f"✅ Modifications et données IoT enregistrées ! {msg}")

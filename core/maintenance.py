@@ -1,22 +1,15 @@
 import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta
-from utils.db import DB_PATH, execute_query, load_sql_to_dataframe
+from utils.db import get_db_connection, execute_query, load_sql_to_dataframe
 from utils.email_utils import send_suspension_email
-
-def _connect():
-    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA busy_timeout = 30000")
-    return conn
 
 def process_inactive_users(current_user_id=None):
     """
     Vérifie et suspend les comptes créés depuis plus de 2 minutes
     s'ils n'ont effectué aucune action.
     """
-    conn = _connect()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     suspended_count = 0
@@ -73,12 +66,13 @@ def process_inactive_users(current_user_id=None):
         conn.close()
         
     return suspended_count, suspended_emails
+
 def reorder_user_ids():
     """
     Réordonne tous les user_id de 1 à N pour combler les trous après une suppression.
     Met à jour toutes les tables liées (warehouses, delivery_points, reservations, etc.).
     """
-    conn = _connect()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
