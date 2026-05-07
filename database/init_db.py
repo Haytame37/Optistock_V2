@@ -26,6 +26,7 @@ def create_database():
     cursor.execute("DROP TABLE IF EXISTS delivery_points")
     cursor.execute("DROP TABLE IF EXISTS warehouses")
     cursor.execute("DROP TABLE IF EXISTS users")
+    cursor.execute("DROP TABLE IF EXISTS search_history")
     
     cursor.execute("PRAGMA foreign_keys = ON;")
 
@@ -99,6 +100,20 @@ def create_database():
             updated_at DATETIME DEFAULT (datetime('now', '+1 hours')),
             expires_at DATETIME,
             FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id) ON DELETE CASCADE,
+            FOREIGN KEY (researcher_id) REFERENCES users(user_id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 6. Table search_history
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS search_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            researcher_id INTEGER,
+            product_name TEXT,
+            volume REAL,
+            duration_days INTEGER,
+            results_json TEXT,
+            created_at DATETIME DEFAULT (datetime('now', '+1 hours')),
             FOREIGN KEY (researcher_id) REFERENCES users(user_id) ON DELETE CASCADE
         )
     ''')

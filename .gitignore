@@ -13,6 +13,8 @@ ENV/
 
 # Base de données locale (Pour éviter les conflits)
 *.db
+*.db-shm
+*.db-wal
 
 # Dossiers d'outils (VS Code, Mac, Windows)
 .vscode/

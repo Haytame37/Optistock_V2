@@ -88,13 +88,21 @@ def get_warehouses_by_owner(owner_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT warehouse_id, name, address, volume_m3, latitude, longitude, status FROM warehouses WHERE owner_id = ?", (owner_id,))
+        cursor.execute("""
+            SELECT w.warehouse_id, w.name, w.address, w.volume_m3, w.latitude, w.longitude, w.status,
+                   (SELECT COUNT(*) FROM reservations r WHERE r.warehouse_id = w.warehouse_id AND r.status = 'confirmed') as is_rented
+            FROM warehouses w 
+            WHERE w.owner_id = ?
+        """, (owner_id,))
         rows = cursor.fetchall()
         
         result = []
         for r in rows:
-            st_val = "Disponible"
-            if r['status'] == "unavailable": st_val = "Non disponible"
+            if r['is_rented'] > 0:
+                st_val = "Actif"
+            else:
+                st_val = "Disponible"
+                if r['status'] == "unavailable": st_val = "Non disponible"
             
             result.append({
                 "id": r['warehouse_id'],
@@ -104,7 +112,8 @@ def get_warehouses_by_owner(owner_id):
                 "lat": r['latitude'],
                 "lon": r['longitude'],
                 "gps": f"{r['latitude']}° N, {r['longitude']}° E",
-                "status": st_val
+                "status": st_val,
+                "is_rented": r['is_rented'] > 0
             })
         return result
     except Exception as e:
@@ -121,18 +130,22 @@ def get_recent_warehouses_by_owner(owner_id, limit=3):
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT warehouse_id, name, address, latitude, longitude, status 
-            FROM warehouses 
-            WHERE owner_id = ? 
-            ORDER BY warehouse_id DESC 
+            SELECT w.warehouse_id, w.name, w.address, w.latitude, w.longitude, w.status,
+                   (SELECT COUNT(*) FROM reservations r WHERE r.warehouse_id = w.warehouse_id AND r.status = 'confirmed') as is_rented
+            FROM warehouses w 
+            WHERE w.owner_id = ? 
+            ORDER BY w.warehouse_id DESC 
             LIMIT ?
         """, (owner_id, limit))
         rows = cursor.fetchall()
         
         result = []
         for r in rows:
-            st_val = "Disponible"
-            if r['status'] == "unavailable": st_val = "Non disponible"
+            if r['is_rented'] > 0:
+                st_val = "Actif"
+            else:
+                st_val = "Disponible"
+                if r['status'] == "unavailable": st_val = "Non disponible"
             
             result.append({
                 "id": r['warehouse_id'],
@@ -141,7 +154,8 @@ def get_recent_warehouses_by_owner(owner_id, limit=3):
                 "lat": r['latitude'],
                 "lon": r['longitude'],
                 "gps": f"{r['latitude']}° N, {r['longitude']}° E",
-                "status": st_val
+                "status": st_val,
+                "is_rented": r['is_rented'] > 0
             })
         return result
     except Exception as e:
