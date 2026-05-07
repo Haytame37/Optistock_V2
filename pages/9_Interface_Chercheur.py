@@ -559,10 +559,10 @@ if current_view == "home":
 
     with nav2:
         with st.container(border=True):
-            st.markdown('<h3 style="margin-top:0;">Mes resultats</h3>', unsafe_allow_html=True)
-            st.markdown(f"Voir les derniers entrepots suggeres, le contexte de recherche et les donnees deja importees.\n\n*{results_count} resultat(s) disponibles.*")
-            if st.button("Voir les resultats", use_container_width=True):
-                set_view("results")
+            st.markdown('<h3 style="margin-top:0; color:#27ae60;">Mes entrepôts</h3>', unsafe_allow_html=True)
+            st.markdown("Consulter la liste de vos entrepôts loués et surveillez en temps réel les conditions IoT.\n\n*Réservations confirmées uniquement.*")
+            if st.button("Voir mes entrepôts", use_container_width=True):
+                set_view("mes_entrepots")
 
     with nav3:
         with st.container(border=True):
@@ -576,8 +576,9 @@ if current_view != "home":
     with top_left:
         labels = {
             "search": "Recherche d'entrepot",
-            "results": "Mes resultats",
+            "mes_entrepots": "Mes entrepôts loués",
             "responses": "Reponses des proprietaires",
+            "results": "Mes resultats"
         }
         st.subheader(labels.get(current_view, "Interface chercheur"))
     with top_right:
@@ -928,7 +929,28 @@ if current_view == "search":
 
 
 
-elif current_view == "results":
+elif current_view == "mes_entrepots":
+    st.markdown("### Vos Entrepôts Loués (Actifs)")
+    st.write("Voici la liste des entrepôts pour lesquels vous avez une location en cours. Accédez au suivi IoT pour surveiller vos marchandises en temps réel.")
+    
+    rented_warehouses = owner_responses_df[owner_responses_df['status'] == 'confirmed']
+    
+    if rented_warehouses.empty:
+        st.info("Vous n'avez aucun entrepôt loué pour le moment.")
+    else:
+        for idx, row in rented_warehouses.iterrows():
+            with st.container(border=True):
+                c1, c2 = st.columns([8, 2])
+                with c1:
+                    st.markdown(f"#### 📦 {row['warehouse_name']}")
+                    st.markdown(f"📍 **Adresse:** {row['warehouse_address']}")
+                    st.caption(f"Réservation confirmée le : {row['created_at']}")
+                with c2:
+                    st.write("")
+                    if st.button("📊 Dashboard IoT", key=f"iot_{row['warehouse_id']}_{row.get('reservation_id', idx)}", type="primary", use_container_width=True):
+                        st.switch_page("pages/8_Dashboard_IoT.py")
+        
+if current_view == "results":
     st.markdown('<div class="section-card"><h3 style="margin:0;">Historique des recherches</h3></div>', unsafe_allow_html=True)
 
     # Charger l'historique depuis la base de données
@@ -1216,6 +1238,30 @@ elif current_view == "responses":
                 with col_ref_btn:
                     if st.button("🔄 Rafraîchir", key=f"refresh_r_{sel_id}"):
                         st.rerun()
+
+                st.divider()
+                import sqlite3
+                from utils.db import DB_PATH, execute_query
+                conn = sqlite3.connect(DB_PATH)
+                df_offer = pd.read_sql_query("SELECT reservation_id, global_score, reason FROM reservations WHERE warehouse_id = ? AND researcher_id = ? AND status = 'pending'", conn, params=(sel_row['warehouse_id'], researcher_id))
+                df_confirmed = pd.read_sql_query("SELECT reservation_id FROM reservations WHERE warehouse_id = ? AND researcher_id = ? AND status = 'confirmed'", conn, params=(sel_row['warehouse_id'], researcher_id))
+                conn.close()
+                
+                if not df_offer.empty:
+                    st.markdown("### 🤝 Offre en attente")
+                    offer_row = df_offer.iloc[0]
+                    st.info(f"**Offre de location reçue du propriétaire**\n- Prix : {offer_row['global_score']} DH\n- Date de début : {offer_row['reason']}")
+                    
+                    if st.button("Accepter l'offre et débloquer l'accès IoT", type="primary", key=f"accept_offer_{sel_id}"):
+                        execute_query("UPDATE reservations SET status = 'confirmed' WHERE reservation_id = ?", (str(offer_row['reservation_id']),))
+                        send_chat_message(sel_id, int(researcher_id), "researcher", f"✅ **OFFRE ACCEPTÉE** (Prix : {offer_row['global_score']} DH). L'accès au Dashboard IoT a été débloqué.")
+                        st.success("Offre acceptée ! Vous pouvez maintenant accéder au Dashboard IoT pour cet entrepôt.")
+                        st.rerun()
+                elif not df_confirmed.empty:
+                    st.markdown("### 📊 Suivi IoT Actif")
+                    st.success("L'offre a été acceptée. Vous avez accès au suivi des capteurs (Température / Humidité) de cet entrepôt en temps réel.")
+                    if st.button("Accéder au Dashboard IoT", type="primary", key=f"goto_iot_{sel_id}"):
+                        st.switch_page("pages/8_Dashboard_IoT.py")
 
         # ── Onglet : En attente ──────────────────────────────────────────────
         with tab_pend:

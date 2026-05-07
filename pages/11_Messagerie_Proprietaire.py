@@ -11,6 +11,7 @@ from core.messaging import (
     update_contact_request_status,
 )
 from utils.ui import hide_sidebar
+from utils.db import execute_query
 
 # =====================================================
 # Config & Sécurité
@@ -337,6 +338,35 @@ with tab_chat:
         with col_refresh:
             if st.button("🔄 Rafraîchir", key=f"refresh_owner_{sel_req_id}"):
                 st.rerun()
+
+        st.divider()
+        with st.expander("🤝 Proposer une offre de location"):
+            st.markdown("Proposez vos conditions pour cet entrepôt au chercheur. S'il accepte, il aura accès au Dashboard IoT en temps réel.")
+            o_col1, o_col2 = st.columns(2)
+            with o_col1:
+                offer_price = st.number_input("Prix de location (DH)", min_value=0.0, step=100.0, key=f"offer_price_{sel_req_id}")
+            with o_col2:
+                offer_date = st.date_input("Date de début", key=f"offer_date_{sel_req_id}")
+            if st.button("Envoyer l'offre", type="primary", key=f"send_offer_{sel_req_id}"):
+                import uuid
+                import sqlite3
+                from utils.db import DB_PATH
+                
+                conn = sqlite3.connect(DB_PATH)
+                df_check = pd.read_sql_query("SELECT reservation_id FROM reservations WHERE warehouse_id = ? AND researcher_id = ? AND status = 'pending'", conn, params=(sel_row['warehouse_id'], sel_row['researcher_id']))
+                conn.close()
+                
+                if not df_check.empty:
+                    st.warning("Une offre est déjà en attente d'acceptation par le chercheur.")
+                else:
+                    res_id = str(uuid.uuid4())[:8]
+                    execute_query(
+                        "INSERT INTO reservations (reservation_id, warehouse_id, researcher_id, global_score, status, reason) VALUES (?, ?, ?, ?, 'pending', ?)",
+                        (res_id, str(sel_row['warehouse_id']), int(sel_row['researcher_id']), float(offer_price), str(offer_date))
+                    )
+                    send_chat_message(sel_req_id, owner_id, "owner", f"🏢 **OFFRE DE LOCATION**\\n\\n💰 Prix proposé : **{offer_price} DH**\\n📅 Date de début : **{offer_date}**\\n\\n*(Le chercheur peut accepter cette offre depuis son interface pour débloquer l'accès IoT)*")
+                    st.success("Offre envoyée avec succès !")
+                    st.rerun()
 
 # ─── Onglet 3 : Historique ─────────────────────────────────────────────────
 with tab_history:

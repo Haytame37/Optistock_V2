@@ -178,7 +178,7 @@ with col3:
     )
     with st.container(border=True):
         st.markdown(f'<h3 style="color:#1d4ed8; margin-top:0;">💬 Messagerie {_badge}</h3>', unsafe_allow_html=True)
-        st.markdown('<p style="font-size:13px; color:#414751;">Gérez les demandes des chercheurs et échangez en temps réel avec eux.</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:13px; color:#414751;">Gérez les demandes et échangez en temps réel.</p>', unsafe_allow_html=True)
         if st.button("💬 Ouvrir la messagerie ➜", key="goto_msg", use_container_width=True, type="primary"):
             st.switch_page("pages/11_Messagerie_Proprietaire.py")
 

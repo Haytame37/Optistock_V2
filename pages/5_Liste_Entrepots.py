@@ -137,7 +137,7 @@ with c1:
 with c2:
     filtre = st.radio(
         "Statut",
-        ["Tous", "Disponible", "Non disponible"],
+        ["Tous", "Disponible", "Actif", "Non disponible"],
         horizontal=True
     )
 
@@ -173,21 +173,25 @@ else:
         with cols[idx % 3]:
             badge_class = {
                 "Disponible": "badge-ok",
-                "Non disponible": "badge-unavailable"
-            }[wh["status"]]
+                "Non disponible": "badge-unavailable",
+                "Actif": "badge-ok"
+            }.get(wh["status"], "badge-ok")
     
             st.markdown(f"""
             <div class="card">
-                <span class="{badge_class}">{wh["status"].upper()}</span>
+                <span class="{badge_class}" style="{'background:#dbeafe; color:#1e40af;' if wh['status'] == 'Actif' else ''}">{wh["status"].upper()}</span>
                 <h4 style="margin-top:8px;">{wh["name"]}</h4>
                 <p class="small">📍 {wh["address"]}</p>
                 <p class="small">🛰 GPS: {wh["gps"]}</p>
             </div>
             """, unsafe_allow_html=True)
     
-            c_edit, c_del = st.columns(2)
-            c_edit.button("✏️ Modifier", key=f"edit_{wh['id']}", on_click=on_edit_click, args=(wh["id"],))
-            c_del.button("🗑 Supprimer", key=f"del_{wh['id']}", on_click=on_delete_click, args=(wh["id"], wh["name"]))
+            c_edit, c_del, c_iot = st.columns([1, 1, 1])
+            c_edit.button("✏️ Modif", key=f"edit_{wh['id']}", on_click=on_edit_click, args=(wh["id"],))
+            c_del.button("🗑 Suppr", key=f"del_{wh['id']}", on_click=on_delete_click, args=(wh["id"], wh["name"]))
+            
+            if c_iot.button("📊 IoT", key=f"iot_{wh['id']}", type="primary"):
+                st.switch_page("pages/8_Dashboard_IoT.py")
 
 # -----------------------------
 # Bouton Ajouter
