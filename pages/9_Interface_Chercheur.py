@@ -640,6 +640,10 @@ if current_view == "search":
                     st.session_state["researcher_search_step"] = 2
                     st.rerun()
             with col_quick:
+                if st.button("🚀 Recherche rapide (produit uniquement)", key="go_quick_search", use_container_width=True, type="primary"):
+                    st.session_state["researcher_quick_search"] = True
+                    st.session_state["researcher_search_step"] = 4
+                    st.rerun()
                 st.markdown(
                     '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;font-size:13px;color:#1e40af;">'
                     "<b>Mode rapide</b> : chercher parmi tous les entrepots de la plateforme "
@@ -647,10 +651,7 @@ if current_view == "search":
                     "</div>",
                     unsafe_allow_html=True,
                 )
-                if st.button("🚀 Recherche rapide (produit uniquement)", key="go_quick_search", use_container_width=True, type="primary"):
-                    st.session_state["researcher_quick_search"] = True
-                    st.session_state["researcher_search_step"] = 4
-                    st.rerun()
+
         # Fin de l'étape 1
 
     elif current_step == 2:
@@ -760,6 +761,51 @@ if current_view == "search":
                     st.rerun()
                 else:
                     st.warning("Le nom du client est requis.")
+
+            st.markdown("---")
+            st.markdown("**Ou importer une liste depuis un fichier CSV :**")
+            st.caption("Le fichier CSV doit contenir les colonnes : `nom` (ou `name`), `latitude` (ou `lat`), `longitude` (ou `lon`).")
+            uploaded_file = st.file_uploader("Fichier CSV", type=["csv"], key="csv_clients_uploader")
+            if uploaded_file is not None:
+                try:
+                    df_clients = pd.read_csv(uploaded_file)
+                    
+                    # Normaliser les noms de colonnes
+                    df_clients.columns = [str(col).strip().lower() for col in df_clients.columns]
+                    
+                    # Chercher les colonnes correspondantes
+                    col_nom = next((col for col in df_clients.columns if col in ['nom', 'name', 'client', 'nom du client', 'nom_du_client']), None)
+                    col_lat = next((col for col in df_clients.columns if 'lat' in col), None)
+                    col_lon = next((col for col in df_clients.columns if 'lon' in col), None)
+
+                    if col_nom and col_lat and col_lon:
+                        added_count = 0
+                        for _, row in df_clients.iterrows():
+                            # Nettoyage minimal pour éviter les NaN ou chaînes vides
+                            name_val = str(row[col_nom]).strip()
+                            if pd.isna(row[col_lat]) or pd.isna(row[col_lon]) or not name_val or name_val == "nan":
+                                continue
+                            
+                            draft_clients.append(
+                                {
+                                    "name": name_val,
+                                    "latitude": float(row[col_lat]),
+                                    "longitude": float(row[col_lon]),
+                                }
+                            )
+                            added_count += 1
+                        
+                        if added_count > 0:
+                            st.session_state["researcher_search_clients"] = draft_clients
+                            st.success(f"✅ {added_count} clients importés avec succès !")
+                            # st.rerun() n'est pas appelé immédiatement ici pour laisser l'utilisateur voir le message de succès s'il le souhaite,
+                            # ou on peut rerun mais il perdra le message. Utilisons un sleep léger ou laissons l'utilisateur cliquer sur "Suivant".
+                            # Un rerun rafraîchit la page et affiche les clients en dessous.
+                            st.rerun()
+                    else:
+                        st.error("Le fichier CSV doit contenir les colonnes : nom, latitude, longitude. Colonnes trouvées : " + ", ".join(df_clients.columns))
+                except Exception as e:
+                    st.error(f"Erreur lors de la lecture du fichier CSV : {e}")
 
         # Division fermée par le contexte du conteneur
 
