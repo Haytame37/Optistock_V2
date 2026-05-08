@@ -76,18 +76,9 @@ st.markdown("""
 st.markdown("<div style='height:90px'></div>", unsafe_allow_html=True)
 
 # =====================================================
-# Carte de connexion (Format Desktop)
+# Carte de connexion centrée
 # =====================================================
-col_img, col_form = st.columns([1.2, 1], gap="large")
-
-with col_img:
-    st.markdown('''
-    <div style="padding-top: 40px; padding-left: 20px;">
-        <h2 style="color: #005da7; font-size: 2rem;">L'intelligence au service de votre logistique</h2>
-        <p style="color: #555d64; font-size: 1.1rem; margin-bottom: 24px;">Connectez-vous pour superviser vos inventaires en temps réel, analyser vos données logistiques et prendre les meilleures décisions.</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    st.image("https://images.unsplash.com/photo-1580674285054-bed31e145f59?q=80&w=2070&auto=format&fit=crop", use_container_width=True)
+_, col_form, _ = st.columns([1, 1.4, 1])
 
 with col_form:
     with st.container(border=True):
@@ -111,20 +102,41 @@ with col_form:
 
         with col_btn2:
             if st.button("❓ Mot de passe oublié"):
-                st.info("Lien de récupération envoyé par email (simulé)")
+                st.switch_page("pages/5_Forgot_Password.py")
 
         if submit:
             if not email or not password:
                 st.error("Veuillez renseigner votre email et votre mot de passe")
             else:
                 from core.auth import authenticate_user
+                from utils.db import load_sql_to_dataframe
                 result = authenticate_user(email, password)
+
+                def redirect_user(user):
+                    """Redirige l'utilisateur — vers changement mdp si temporaire, sinon dashboard."""
+                    st.session_state['user']      = user
+                    st.session_state['user_id']   = user['user_id']
+                    st.session_state['role']      = user['role']
+                    st.session_state['logged_in'] = True
+                    # Vérifier le flag must_change_password
+                    df = load_sql_to_dataframe(
+                        "SELECT must_change_password FROM users WHERE user_id = ?",
+                        (user['user_id'],)
+                    )
+                    must_change = (not df.empty and df.iloc[0]['must_change_password'] == 1)
+                    if must_change:
+                        st.switch_page("pages/7_Change_Password.py")
+                    elif user['role'] == 'admin':
+                        st.switch_page("pages/3_Dashboard_Admin.py")
+                    elif user['role'] == 'researcher':
+                        st.switch_page("pages/9_Interface_Chercheur.py")
+                    elif user['role'] == 'owner':
+                        st.switch_page("pages/4_Interface_Proprietaire.py")
 
                 if result is None:
                     st.error("❌ Identifiants incorrects.")
 
                 elif isinstance(result, list):
-                    # Plusieurs comptes actifs sur le même email → sélecteur de rôle
                     st.info("🔀 Plusieurs comptes sont associés à cet email. Choisissez votre profil :")
                     role_labels = {
                         "admin":      "⚙️ Administrateur",
@@ -137,36 +149,15 @@ with col_form:
                     }
                     chosen_label = st.selectbox("Sélectionnez votre compte :", list(options.keys()), key="multi_account_select")
                     if st.button("✅ Confirmer et se connecter", type="primary", use_container_width=True):
-                        user = options[chosen_label]
-                        st.success(f"✅ Bienvenue {user['first_name']} ! Connexion réussie.")
-                        st.session_state['user']      = user
-                        st.session_state['user_id']   = user['user_id']
-                        st.session_state['role']      = user['role']
-                        st.session_state['logged_in'] = True
-                        if user['role'] == 'admin':
-                            st.switch_page("pages/3_Dashboard_Admin.py")
-                        elif user['role'] == 'researcher':
-                            st.switch_page("pages/9_Interface_Chercheur.py")
-                        elif user['role'] == 'owner':
-                            st.switch_page("pages/4_Interface_Proprietaire.py")
+                        redirect_user(options[chosen_label])
 
                 else:
-                    # Un seul compte → connexion directe
                     user = result
                     if user['is_active'] == 0:
                         st.error("❌ Votre compte est désactivé.")
                     else:
                         st.success(f"✅ Bienvenue {user['first_name']} ! Connexion réussie.")
-                        st.session_state['user']      = user
-                        st.session_state['user_id']   = user['user_id']
-                        st.session_state['role']      = user['role']
-                        st.session_state['logged_in'] = True
-                        if user['role'] == 'admin':
-                            st.switch_page("pages/3_Dashboard_Admin.py")
-                        elif user['role'] == 'researcher':
-                            st.switch_page("pages/9_Interface_Chercheur.py")
-                        elif user['role'] == 'owner':
-                            st.switch_page("pages/4_Interface_Proprietaire.py")
+                        redirect_user(user)
 
 
         st.markdown("---")

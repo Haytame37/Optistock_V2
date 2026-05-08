@@ -16,7 +16,8 @@ def check_password(password, hashed_password):
     return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 def create_user(role, first_name, last_name, email, password):
-    """Crée un nouveau compte utilisateur avec un mot de passe sécurisé."""
+    """Crée un nouveau compte utilisateur avec un mot de passe sécurisé.
+    Retourne (True, None) en cas de succès ou (False, str_erreur) en cas d'échec."""
     conn = None
     try:
         conn = get_db_connection()
@@ -28,10 +29,10 @@ def create_user(role, first_name, last_name, email, password):
             (role, first_name, last_name, email, hash_password(password), now_str, now_str)
         )
         conn.commit()
-        return True
+        return True, None
     except Exception as e:
         print(f"Error creating user: {e}")
-        return False
+        return False, str(e)
     finally:
         if conn:
             conn.close()

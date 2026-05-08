@@ -202,18 +202,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================
-# Mise en page
+# Mise en page — formulaire centré
 # =====================================================
-col_img, col_form = st.columns([1.2, 1], gap="large")
-
-with col_img:
-    st.markdown('''
-    <div style="padding-top: 40px; padding-left: 20px;">
-        <h2 style="color: #005da7; font-size: 2rem;">Rejoignez la révolution logistique</h2>
-        <p style="color: #555d64; font-size: 1.1rem; margin-bottom: 24px;">Créez votre compte pour optimiser vos flux de stockage et rejoindre les leaders de l'industrie pour une gestion intelligente.</p>
-    </div>
-    ''', unsafe_allow_html=True)
-    st.image("https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2000&auto=format&fit=crop", use_container_width=True)
+_, col_form, _ = st.columns([1, 2, 1])
 
 with col_form:
     with st.container(border=True):
@@ -346,13 +337,36 @@ with col_form:
                 first_name = parts[0]
                 last_name  = parts[1] if len(parts) > 1 else ""
 
-                from core.auth import create_user
-                success = create_user(db_role, first_name, last_name, email, password)
+                from core.auth import create_user, authenticate_user
+                success, err_msg = create_user(db_role, first_name, last_name, email, password)
                 if success:
-                    st.success("✅ Compte créé avec succès !")
-                    st.info("Vous pouvez maintenant vous connecter.")
+                    # Connexion automatique après inscription
+                    user = authenticate_user(email, password)
+                    # authenticate_user peut retourner un dict ou une liste (multi-comptes)
+                    if isinstance(user, list):
+                        user = next((u for u in user if u["role"] == db_role), user[0])
+
+                    if user:
+                        st.session_state["user"]      = user
+                        st.session_state["user_id"]   = user["user_id"]
+                        st.session_state["role"]      = user["role"]
+                        st.session_state["first_name"]= user["first_name"]
+                        st.session_state["logged_in"] = True
+
+                        st.success(f"✅ Bienvenue {first_name} ! Votre compte a été créé avec succès.")
+
+                        if db_role == "researcher":
+                            st.switch_page("pages/9_Interface_Chercheur.py")
+                        elif db_role == "owner":
+                            st.switch_page("pages/4_Interface_Proprietaire.py")
+                        else:
+                            st.switch_page("pages/3_Dashboard_Admin.py")
+                    else:
+                        st.success("✅ Compte créé avec succès !")
+                        st.switch_page("pages/1_Login.py")
                 else:
-                    st.error("❌ Une erreur serveur est survenue. Veuillez réessayer.")
+                    st.error(f"❌ Erreur lors de la création du compte : {err_msg}")
+
 
 
         st.markdown("---")

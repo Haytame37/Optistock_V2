@@ -248,11 +248,12 @@ def render_users_page():
             if st.form_submit_button("Créer l'utilisateur", type="primary"):
                 if first_name and last_name and email and password:
                     from core.auth import create_user
-                    if create_user(role, first_name, last_name, email, password):
+                    ok, err = create_user(role, first_name, last_name, email, password)
+                    if ok:
                         st.success("Utilisateur créé !")
                         st.rerun()
                     else:
-                        st.error("Erreur lors de la création de l'utilisateur (l'email est peut-être déjà utilisé).")
+                        st.error(f"Erreur lors de la création : {err}")
                 else:
                     st.warning("Veuillez remplir tous les champs.")
 

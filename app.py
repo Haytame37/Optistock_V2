@@ -1,6 +1,8 @@
 import streamlit as st
 import base64
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Charge les variables SMTP depuis .env
 
 # Configuration de la page
 st.set_page_config(
@@ -153,21 +155,46 @@ for i, feature in enumerate(features):
 
 # --- Illustration Section ---
 st.write("")
-st.image("https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop", 
-         caption="Modern high-tech warehouse interior", 
-         use_container_width=True)
+st.markdown("""
+<div style="
+    display: flex;
+    justify-content: center;
+    margin: 10px 0 20px 0;
+">
+    <div style="
+        width: 80%;
+        max-width: 860px;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 12px 40px rgba(0, 93, 167, 0.18);
+        border: 1px solid #d1e2f3;
+    ">
+        <img
+            src="https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=1600&auto=format&fit=crop"
+            style="
+                width: 100%;
+                height: 300px;
+                object-fit: cover;
+                object-position: center;
+                display: block;
+            "
+        />
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+
 
 # --- Bottom Navigation / Actions ---
 st.markdown("---")
 col_login, col_signup = st.columns(2)
 
 with col_login:
-    # Utilisation d'un bouton primaire pour éviter le wrapper div vide tout en gardant l'accent visuel
-    if st.button("Commencer maintenant", type="primary", use_container_width=True):
-        st.switch_page("pages/1_Login.py")
+    if st.button("Commencer", type="primary", use_container_width=True):
+        st.switch_page("pages/6_Welcome.py")
 
 with col_signup:
-    if st.button("Voir la démo", use_container_width=True):
+    if st.button("📘 Guide", use_container_width=True):
         st.session_state.show_demo = not st.session_state.get('show_demo', False)
 
 # --- Help Guide Section ---
@@ -176,10 +203,9 @@ if st.session_state.get('show_demo', False):
         <div style="background-color: white; padding: 25px; border-radius: 15px; border: 1px solid #D1E2F3; margin-top: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2 style="color: #005da7; margin: 0; font-family: 'Work Sans', sans-serif;">📘 Guide d'utilisation OptiStock</h2>
-                <span style="background: #e0f2fe; color: #005da7; padding: 5px 15px; border-radius: 20px; font-size: 14px; font-weight: 600;">Mode Démo</span>
             </div>
             <p style="color: #555d64; font-size: 16px; margin-bottom: 25px;">
-                Bienvenue dans la démo d'OptiStock. Notre plateforme connecte les chercheurs logistiques et les propriétaires d'entrepôts via une interface intelligente et connectée.
+                Bienvenue sur OptiStock. Notre plateforme connecte les chercheurs logistiques et les propriétaires d'entrepôts via une interface intelligente et connectée.
             </p>
         </div>
     """, unsafe_allow_html=True)
