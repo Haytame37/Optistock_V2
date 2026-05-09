@@ -71,130 +71,187 @@ with col_form:
         st.caption("Récupérez l'accès à votre compte OptiStock")
         st.write("")
 
-        recovery_email = st.text_input(
-            "📧 Votre adresse e-mail",
-            placeholder="nom@entreprise.com",
-            key="recovery_email"
-        )
+        # =====================================================
+        # Logique par étape
+        # =====================================================
+        if "forgot_step" not in st.session_state:
+            st.session_state.forgot_step = "email"
 
-        col_send, col_back = st.columns([2, 1])
-        with col_send:
-            send_btn = st.button(
-                "✉️ Envoyer le mot de passe",
-                type="primary",
-                use_container_width=True,
-                key="send_btn"
+        if st.session_state.forgot_step == "email":
+            recovery_email = st.text_input(
+                "📧 Votre adresse e-mail",
+                placeholder="nom@entreprise.com",
+                key="recovery_email_input"
             )
-        with col_back:
-            if st.button("← Retour", use_container_width=True, key="back_btn"):
-                st.switch_page("pages/1_Login.py")
 
-        st.write("")
-
-        if send_btn:
-            if not recovery_email or "@" not in recovery_email:
-                st.error("❌ Veuillez entrer une adresse e-mail valide.")
-            else:
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT user_id, first_name, role FROM users WHERE email = ? AND is_active = 1",
-                    (recovery_email,)
+            col_send, col_back = st.columns([2, 1])
+            with col_send:
+                send_btn = st.button(
+                    "✉️ Envoyer l'OTP",
+                    type="primary",
+                    use_container_width=True,
+                    key="send_otp_btn"
                 )
-                accounts = cursor.fetchall()
+            with col_back:
+                if st.button("← Retour", use_container_width=True, key="back_btn"):
+                    st.switch_page("pages/1_Login.py")
 
-                if not accounts:
-                    st.warning("⚠️ Aucun compte actif trouvé avec cette adresse e-mail.")
-                    conn.close()
+            if send_btn:
+                if not recovery_email or "@" not in recovery_email:
+                    st.error("❌ Veuillez entrer une adresse e-mail valide.")
                 else:
-                    # Générer un mot de passe temporaire sécurisé
-                    alphabet = string.ascii_letters + string.digits + "!@#$%"
-                    temp_pwd = (
-                        secrets.choice(string.ascii_uppercase) +
-                        secrets.choice(string.ascii_lowercase) +
-                        secrets.choice(string.digits) +
-                        secrets.choice("!@#$%") +
-                        "".join(secrets.choice(alphabet) for _ in range(6))
-                    )
-
-                    # Mettre à jour tous les comptes + activer le flag de réinitialisation
-                    new_hash = hash_password(temp_pwd)
+                    conn = sqlite3.connect(DB_PATH)
+                    cursor = conn.cursor()
                     cursor.execute(
-                        "UPDATE users SET password_hash = ?, must_change_password = 1 WHERE email = ? AND is_active = 1",
-                        (new_hash, recovery_email)
+                        "SELECT user_id, first_name FROM users WHERE email = ? AND is_active = 1",
+                        (recovery_email,)
+                    )
+                    user = cursor.fetchone()
+
+                    if not user:
+                        st.warning("⚠️ Aucun compte actif trouvé avec cette adresse e-mail.")
+                        conn.close()
+                    else:
+                        # Générer un OTP à 6 chiffres
+                        otp_code = "".join(secrets.choice(string.digits) for _ in range(6))
+                        from utils.helpers import get_current_time
+                        from datetime import timedelta
+                        
+                        expiry_time = (get_current_time() + timedelta(minutes=10)).strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # Mettre à jour l'utilisateur avec l'OTP
+                        cursor.execute(
+                            "UPDATE users SET otp_code = ?, otp_expiry = ? WHERE email = ? AND is_active = 1",
+                            (otp_code, expiry_time, recovery_email)
+                        )
+                        conn.commit()
+                        conn.close()
+
+                        first_name = user[1]
+                        
+                        # Configuration SMTP
+                        smtp_server  = os.getenv("SMTP_SERVER",   "smtp.gmail.com")
+                        smtp_port    = int(os.getenv("SMTP_PORT", "587"))
+                        sender_email = os.getenv("SENDER_EMAIL",  "")
+                        sender_pwd   = os.getenv("SENDER_PASSWORD", "")
+
+                        email_html = f"""
+                        <html><body style="font-family:Inter,sans-serif;background:#f4fafd;padding:30px;">
+                          <div style="max-width:480px;margin:auto;background:#fff;border-radius:16px;
+                                      border:1px solid #dbe7f3;padding:32px;box-shadow:0 8px 24px rgba(0,93,167,0.08);">
+                            <div style="text-align:center;margin-bottom:24px;">
+                              <h2 style="color:#005da7;margin:0;">📦 OptiStock Solutions</h2>
+                              <p style="color:#64748b;font-size:13px;margin:4px 0 0;">Vérification de sécurité</p>
+                            </div>
+                            <p style="color:#1e293b;font-size:15px;">Bonjour <b>{first_name}</b>,</p>
+                            <p style="color:#475569;font-size:14px;line-height:1.6;">
+                              Utilisez le code suivant pour réinitialiser votre mot de passe OptiStock :
+                            </p>
+                            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;
+                                        padding:20px;text-align:center;margin:20px 0;">
+                              <div style="font-size:32px;font-weight:900;color:#15803d;
+                                          letter-spacing:8px;background:#fff;border-radius:8px;
+                                          padding:12px;border:1px dashed #4ade80;">{otp_code}</div>
+                              <p style="color:#6b7280;font-size:12px;margin:10px 0 0;">
+                                Ce code expirera dans 10 minutes.
+                              </p>
+                            </div>
+                            <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px;">
+                              Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.<br>
+                              © 2026 OptiStock Logistics Intelligence
+                            </p>
+                          </div>
+                        </body></html>"""
+
+                        try:
+                            msg = MIMEMultipart("alternative")
+                            msg["Subject"] = f"🔑 {otp_code} est votre code de vérification OptiStock"
+                            msg["From"]    = sender_email
+                            msg["To"]      = recovery_email
+                            msg.attach(MIMEText(email_html, "html", "utf-8"))
+
+                            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                                server.ehlo()
+                                server.starttls()
+                                server.login(sender_email, sender_pwd)
+                                server.sendmail(sender_email, recovery_email, msg.as_string())
+
+                            st.session_state.forgot_step = "otp"
+                            st.session_state.reset_email = recovery_email
+                            st.success("✅ Code envoyé ! Vérifiez votre boîte mail.")
+                            st.rerun()
+
+                        except Exception as ex:
+                            st.error(f"❌ Erreur lors de l'envoi de l'email : {ex}")
+
+        elif st.session_state.forgot_step == "otp":
+            st.info(f"Un code a été envoyé à **{st.session_state.reset_email}**")
+            otp_input = st.text_input("🔢 Entrez le code à 6 chiffres", placeholder="000000", max_chars=6)
+            
+            col_verify, col_cancel = st.columns([2, 1])
+            with col_verify:
+                if st.button("Vérifier le code", type="primary", use_container_width=True):
+                    if not otp_input:
+                        st.error("Veuillez entrer le code.")
+                    else:
+                        conn = sqlite3.connect(DB_PATH)
+                        cursor = conn.cursor()
+                        from utils.helpers import get_current_time
+                        now = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        cursor.execute(
+                            "SELECT user_id FROM users WHERE email = ? AND otp_code = ? AND otp_expiry > ?",
+                            (st.session_state.reset_email, otp_input, now)
+                        )
+                        result = cursor.fetchone()
+                        conn.close()
+                        
+                        if result:
+                            st.session_state.forgot_step = "reset"
+                            st.rerun()
+                        else:
+                            st.error("❌ Code invalide ou expiré.")
+            
+            with col_cancel:
+                if st.button("Annuler", use_container_width=True):
+                    st.session_state.forgot_step = "email"
+                    st.rerun()
+
+        elif st.session_state.forgot_step == "reset":
+            st.success("✅ Code vérifié. Choisissez un nouveau mot de passe.")
+            new_pwd = st.text_input("🔐 Nouveau mot de passe", type="password")
+            confirm_pwd = st.text_input("🔁 Confirmez le mot de passe", type="password")
+            
+            if st.button("Mettre à jour le mot de passe", type="primary", use_container_width=True):
+                if not new_pwd:
+                    st.error("Veuillez entrer un mot de passe.")
+                elif len(new_pwd) < 8:
+                    st.error("Le mot de passe doit contenir au moins 8 caractères.")
+                elif new_pwd != confirm_pwd:
+                    st.error("Les mots de passe ne correspondent pas.")
+                else:
+                    new_hash = hash_password(new_pwd)
+                    conn = sqlite3.connect(DB_PATH)
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE users SET password_hash = ?, must_change_password = 0, otp_code = NULL, otp_expiry = NULL WHERE email = ?",
+                        (new_hash, st.session_state.reset_email)
                     )
                     conn.commit()
                     conn.close()
+                    
+                    st.session_state.forgot_step = "success"
+                    st.rerun()
 
-                    roles_fr = {"admin": "Administrateur", "owner": "Propriétaire", "researcher": "Chercheur"}
-                    comptes_str = ", ".join(
-                        f"{row[1]} ({roles_fr.get(row[2], row[2])})"
-                        for row in accounts
-                    )
-                    first_name = accounts[0][1]
-
-                    # ── Envoi réel via SMTP Gmail ──────────────────────────────
-                    smtp_server  = os.getenv("SMTP_SERVER",   "smtp.gmail.com")
-                    smtp_port    = int(os.getenv("SMTP_PORT", "587"))
-                    sender_email = os.getenv("SENDER_EMAIL",  "")
-                    sender_pwd   = os.getenv("SENDER_PASSWORD", "")
-
-                    email_html = f"""
-<html><body style="font-family:Inter,sans-serif;background:#f4fafd;padding:30px;">
-  <div style="max-width:480px;margin:auto;background:#fff;border-radius:16px;
-              border:1px solid #dbe7f3;padding:32px;box-shadow:0 8px 24px rgba(0,93,167,0.08);">
-    <div style="text-align:center;margin-bottom:24px;">
-      <h2 style="color:#005da7;margin:0;">📦 OptiStock Solutions</h2>
-      <p style="color:#64748b;font-size:13px;margin:4px 0 0;">Réinitialisation de mot de passe</p>
-    </div>
-    <p style="color:#1e293b;font-size:15px;">Bonjour <b>{first_name}</b>,</p>
-    <p style="color:#475569;font-size:14px;line-height:1.6;">
-      Vous avez demandé la réinitialisation de votre mot de passe pour :<br>
-      <b>{comptes_str}</b>
-    </p>
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;
-                padding:20px;text-align:center;margin:20px 0;">
-      <p style="color:#166534;font-size:13px;margin:0 0 8px;">Votre nouveau mot de passe temporaire :</p>
-      <div style="font-size:28px;font-weight:900;color:#15803d;
-                  letter-spacing:4px;background:#fff;border-radius:8px;
-                  padding:12px;border:1px dashed #4ade80;">{temp_pwd}</div>
-      <p style="color:#6b7280;font-size:12px;margin:10px 0 0;">
-        Connectez-vous avec ce mot de passe et changez-le après connexion.
-      </p>
-    </div>
-    <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px;">
-      Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.<br>
-      © 2026 OptiStock Logistics Intelligence
-    </p>
-  </div>
-</body></html>"""
-
-                    try:
-                        msg = MIMEMultipart("alternative")
-                        msg["Subject"] = "🔑 OptiStock — Votre nouveau mot de passe temporaire"
-                        msg["From"]    = sender_email
-                        msg["To"]      = recovery_email
-                        msg.attach(MIMEText(email_html, "html", "utf-8"))
-
-                        with smtplib.SMTP(smtp_server, smtp_port) as server:
-                            server.ehlo()
-                            server.starttls()
-                            server.login(sender_email, sender_pwd)
-                            server.sendmail(sender_email, recovery_email, msg.as_string())
-
-                        st.success("✅ Email envoyé avec succès !")
-                        st.info(f"📧 Un email contenant votre nouveau mot de passe a été envoyé à **{recovery_email}**. Vérifiez votre boîte de réception (et les spams si nécessaire).")
-
-                        st.write("")
-                        if st.button("→ Aller à la connexion", type="primary", use_container_width=True, key="goto_login"):
-                            st.switch_page("pages/1_Login.py")
-
-                    except smtplib.SMTPAuthenticationError:
-                        st.error("❌ Erreur d'authentification SMTP. Vérifiez les identifiants dans le fichier .env")
-                    except smtplib.SMTPException as smtp_err:
-                        st.error(f"❌ Erreur d'envoi email : {smtp_err}")
-                    except Exception as ex:
-                        st.error(f"❌ Erreur inattendue : {ex}")
+        elif st.session_state.forgot_step == "success":
+            st.balloons()
+            st.success("🎉 Votre mot de passe a été mis à jour avec succès !")
+            if st.button("→ Aller à la connexion", type="primary", use_container_width=True):
+                # Nettoyer l'état
+                for key in ["forgot_step", "reset_email"]:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.switch_page("pages/1_Login.py")
 
         st.markdown("---")
         st.caption("Vous vous souvenez de votre mot de passe ?")

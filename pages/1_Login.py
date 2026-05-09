@@ -119,11 +119,14 @@ with col_form:
                     st.session_state['role']      = user['role']
                     st.session_state['logged_in'] = True
                     # Vérifier le flag must_change_password
-                    df = load_sql_to_dataframe(
-                        "SELECT must_change_password FROM users WHERE user_id = ?",
-                        (user['user_id'],)
-                    )
-                    must_change = (not df.empty and df.iloc[0]['must_change_password'] == 1)
+                    try:
+                        df = load_sql_to_dataframe(
+                            "SELECT must_change_password FROM users WHERE user_id = ?",
+                            (user['user_id'],)
+                        )
+                        must_change = (not df.empty and df.iloc[0]['must_change_password'] == 1)
+                    except Exception:
+                        must_change = False
                     if must_change:
                         st.switch_page("pages/7_Change_Password.py")
                     elif user['role'] == 'admin':

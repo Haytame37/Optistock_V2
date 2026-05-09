@@ -27,8 +27,8 @@ def save_search_history(researcher_id, product, volume, duration, results):
             VALUES (?, ?, ?, ?, ?)
         """
         execute_query(query, (researcher_id, product, volume, duration, results_json))
-    except Exception as e:
-        st.error(f"Erreur historique : {e}")
+    except Exception:
+        pass
 
 
 st.set_page_config(
@@ -481,18 +481,21 @@ results_snapshot = st.session_state.get("researcher_last_search")
 
 if not results_snapshot:
     # Essayer de charger la toute dernière recherche depuis la base de données
-    history_df = load_sql_to_dataframe(
-        "SELECT product_name, volume, duration_days, results_json FROM search_history WHERE researcher_id = ? ORDER BY created_at DESC LIMIT 1",
-        (researcher_id,)
-    )
-    if not history_df.empty:
-        last_row = history_df.iloc[0]
-        results_snapshot = {
-            "product": last_row["product_name"],
-            "volume": last_row["volume"],
-            "duration_days": last_row["duration_days"],
-            "results": json.loads(last_row["results_json"])
-        }
+    try:
+        history_df = load_sql_to_dataframe(
+            "SELECT product_name, volume, duration_days, results_json FROM search_history WHERE researcher_id = ? ORDER BY created_at DESC LIMIT 1",
+            (researcher_id,)
+        )
+        if not history_df.empty:
+            last_row = history_df.iloc[0]
+            results_snapshot = {
+                "product": last_row["product_name"],
+                "volume": last_row["volume"],
+                "duration_days": last_row["duration_days"],
+                "results": json.loads(last_row["results_json"])
+            }
+    except Exception:
+        pass
 
 results_count = len(results_snapshot["results"]) if results_snapshot else 0
 
