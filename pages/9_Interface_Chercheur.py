@@ -1,6 +1,9 @@
 import sqlite3
 import uuid
 
+import numpy as np
+from scipy.optimize import minimize
+
 import pandas as pd
 import streamlit as st
 import folium
@@ -31,6 +34,45 @@ def save_search_history(researcher_id, product, volume, duration, results):
         execute_query(query, (researcher_id, product, volume, duration, results_json))
     except Exception:
         pass
+
+
+def fermat_weber(points: np.ndarray) -> tuple:
+    """
+    Calcule le point optimal d'implantation d'un entrepôt en minimisant
+    la somme des distances euclidiennes brutes vers tous les points de livraison
+    (Point de Fermat-Weber / Médiane Géométrique).
+
+    Arguments :
+        points : np.ndarray de forme (N, 2) avec colonnes [latitude, longitude]
+
+    Retourne :
+        (lat_opt, lon_opt, avg_distance_km)
+    """
+    # Fonction objectif : somme des distances euclidiennes brutes (pas de poids)
+    def objective(p):
+        diffs = points - p  # (N, 2)
+        return np.sum(np.sqrt((diffs ** 2).sum(axis=1)))
+
+    # Point de départ : centroïde des points
+    x0 = points.mean(axis=0)
+
+    # Solveur L-BFGS-B (gère les longitudes négatives sans contraintes de positivité)
+    result = minimize(objective, x0, method="L-BFGS-B")
+
+    lat_opt, lon_opt = result.x
+
+    # Distance moyenne réelle (haversine)
+    R = 6371.0
+    lat1_r = np.radians(points[:, 0])
+    lon1_r = np.radians(points[:, 1])
+    lat2_r = np.radians(lat_opt)
+    lon2_r = np.radians(lon_opt)
+    dlat = lat2_r - lat1_r
+    dlon = lon2_r - lon1_r
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1_r) * np.cos(lat2_r) * np.sin(dlon / 2) ** 2
+    avg_dist_km = float(np.mean(2 * R * np.arctan2(np.sqrt(a), np.sqrt(1 - a))))
+
+    return float(lat_opt), float(lon_opt), avg_dist_km
 
 
 st.set_page_config(
@@ -682,405 +724,566 @@ if current_view != "home":
 
 
 if current_view == "search":
-    current_step = st.session_state["researcher_search_step"]
-    draft_warehouses = st.session_state["researcher_search_warehouses"]
-    draft_clients = st.session_state["researcher_search_clients"]
+    tab1, tab2 = st.tabs(["Module 1: Trouver un entrepôt", "Module 2: Implanter un nouvel entrepôt"])
+    with tab2:
+        # ── Session state pour Module 2 ────────────────────────────────────
+        if "m2_clients" not in st.session_state:
+            st.session_state["m2_clients"] = []
+        if "m2_last_file" not in st.session_state:
+            st.session_state["m2_last_file"] = None
 
-    st.markdown('<div class="wizard-shell">', unsafe_allow_html=True)
-    step_cols = st.columns(4)
-    step_labels = ["Produit", "Entrepots", "Clients", "Resultats"]
-    for idx, label in enumerate(step_labels, start=1):
-        with step_cols[idx - 1]:
-            if st.button(
-                f"{idx:02d}\n{label}",
-                key=f"wizard_step_{idx}",
-                use_container_width=True,
-                type="primary" if current_step == idx else "secondary",
-            ):
-                st.session_state["researcher_search_step"] = idx
-                st.rerun()
-            # Label supprimé ici car répété dans le titre de la section
+        m2_clients = st.session_state["m2_clients"]
 
-    if current_step == 1:
+        # ── Saisie des points de livraison ─────────────────────────────────
         with st.container(border=True):
-            st.markdown("### Parametres produit")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.session_state["researcher_search_product"] = st.selectbox(
-                    "Produit",
-                    options=list(PRODUCT_CONDITIONS.keys()),
-                    index=list(PRODUCT_CONDITIONS.keys()).index(st.session_state["researcher_search_product"]),
-                )
-            with c2:
-                st.session_state["researcher_search_volume"] = st.number_input(
-                    "Volume total (m3)",
-                    min_value=0.0,
-                    step=0.1,
-                    value=float(st.session_state["researcher_search_volume"]),
-                )
+            st.markdown("### Points de livraison (Clients)")
 
-            st.session_state["researcher_search_duration"] = st.number_input(
-                "Duree de stockage estimee (jours)",
-                min_value=1,
-                max_value=365,
-                value=int(st.session_state["researcher_search_duration"]),
-            )
-
-            st.divider()
-            col_next, col_quick = st.columns(2)
-            with col_next:
-                if st.button("Suivant — Entrepots ->", key="go_to_warehouses_first", use_container_width=True):
-                    st.session_state["researcher_quick_search"] = False
-                    st.session_state["researcher_search_step"] = 2
-                    st.rerun()
-            with col_quick:
-                if st.button("🚀 Recherche rapide (produit uniquement)", key="go_quick_search", use_container_width=True, type="primary"):
-                    st.session_state["researcher_quick_search"] = True
-                    st.session_state["researcher_search_step"] = 4
-                    st.rerun()
-                st.markdown(
-                    '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;font-size:13px;color:#1e40af;">'
-                    "<b>Mode rapide</b> : chercher parmi tous les entrepots de la plateforme "
-                    "sans entrer d'entrepots ou de clients."
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-
-        # Fin de l'étape 1
-
-    elif current_step == 2:
-        with st.container(border=True):
-            st.markdown("### Ajouter un entrepot existant")
-
-            c1, c2 = st.columns(2)
-            with c1:
-                warehouse_name = st.text_input("Nom", key="draft_wh_name", placeholder="Entrepot Nord Casablanca")
-            with c2:
-                warehouse_address = st.text_input("Adresse / Ville", key="draft_wh_address", placeholder="Ain Sebaa, Casablanca")
-
-            c3, c4, c5 = st.columns(3)
-            with c3:
-                warehouse_lat = st.number_input("Latitude", key="draft_wh_lat", format="%.4f", value=33.57)
-            with c4:
-                warehouse_lon = st.number_input("Longitude", key="draft_wh_lon", format="%.4f", value=-7.59)
-            with c5:
-                warehouse_volume = st.number_input("Volume (m3)", key="draft_wh_volume", min_value=0.0, value=5000.0, step=100.0)
-
-            if st.button("+ Ajouter", key="add_draft_warehouse"):
-                if warehouse_name.strip() and warehouse_address.strip():
-                    draft_warehouses.append(
-                        {
-                            "id_entrepot": str(uuid.uuid4())[:8].upper(),
-                            "nom": warehouse_name.strip(),
-                            "adresse": warehouse_address.strip(),
-                            "latitude": float(warehouse_lat),
-                            "longitude": float(warehouse_lon),
-                            "volume_m3": float(warehouse_volume),
-                        }
-                    )
-                    st.session_state["researcher_search_warehouses"] = draft_warehouses
-                    st.rerun()
-                else:
-                    st.warning("Le nom et l'adresse sont requis pour ajouter un entrepot.")
-
-        # Wizard card closing handled by container
-
-
-        with st.container(border=True):
-            st.markdown(
-                f'### Mes entrepots <span class="mini-badge">{len(draft_warehouses)}</span>',
-                unsafe_allow_html=True,
-            )
-            if not draft_warehouses:
-                st.info("Ajoute au moins un entrepot pour continuer.")
-            else:
-                for idx, warehouse in enumerate(draft_warehouses):
-                    info_col, action_col = st.columns([8, 2])
-                    with info_col:
-                        st.markdown(
-                            f"""
-    <div class="list-item">
-        <div>
-            <div class="list-name">{warehouse["nom"]}</div>
-            <div class="list-meta">{warehouse["adresse"]} · {warehouse["latitude"]:.2f}N · {warehouse["longitude"]:.2f}E · {warehouse["volume_m3"]:.0f} m3</div>
-        </div>
-    </div>
-    """,
-                            unsafe_allow_html=True,
+            # Formulaire manuel
+            with st.expander("➕ Ajouter un client manuellement", expanded=False):
+                mc1, mc2, mc3 = st.columns(3)
+                with mc1:
+                    m2_name = st.text_input("Nom du client", key="m2_name")
+                with mc2:
+                    m2_lat = st.number_input("Latitude", value=33.5731, format="%.4f", key="m2_lat")
+                with mc3:
+                    m2_lon = st.number_input("Longitude", value=-7.5898, format="%.4f", key="m2_lon")
+                if st.button("Ajouter", key="m2_add_client"):
+                    if m2_name.strip():
+                        st.session_state["m2_clients"].append(
+                            {"name": m2_name.strip(), "latitude": m2_lat, "longitude": m2_lon}
                         )
-                    with action_col:
-                        if st.button("Suppr.", key=f"remove_wh_{idx}", use_container_width=True):
-                            draft_warehouses.pop(idx)
-                            st.session_state["researcher_search_warehouses"] = draft_warehouses
-                            st.rerun()
-            prev_col, next_col, skip_col = st.columns(3)
-            with prev_col:
-                if st.button("<- Precedent", key="back_to_product_first", use_container_width=True):
-                    st.session_state["researcher_search_step"] = 1
-                    st.rerun()
-            with next_col:
-                if st.button("Suivant — Clients ->", key="go_to_clients", use_container_width=True):
-                    st.session_state["researcher_quick_search"] = False
-                    st.session_state["researcher_search_step"] = 3
-                    st.rerun()
-            with skip_col:
-                if st.button("Passer aux Resultats ->", key="skip_to_results_from_wh", use_container_width=True):
-                    st.session_state["researcher_quick_search"] = False
-                    st.session_state["researcher_search_step"] = 4
-                    st.rerun()
-        # Division fermée par le contexte du conteneur
+                        st.rerun()
+                    else:
+                        st.warning("Veuillez saisir un nom de client.")
 
-
-    elif current_step == 3:
-        with st.container(border=True):
-            st.markdown("### Ajouter un client / point de livraison")
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                client_name = st.text_input("Nom du client", key="draft_client_name", placeholder="Client Beni Mellal")
-            with c2:
-                client_lat = st.number_input("Latitude client", key="draft_client_lat", format="%.4f", value=32.6667)
-            with c3:
-                client_lon = st.number_input("Longitude client", key="draft_client_lon", format="%.4f", value=-6.35)
-
-            if st.button("+ Ajouter client", key="add_draft_client"):
-                if client_name.strip():
-                    draft_clients.append(
-                        {
-                            "name": client_name.strip(),
-                            "latitude": float(client_lat),
-                            "longitude": float(client_lon),
-                        }
-                    )
-                    st.session_state["researcher_search_clients"] = draft_clients
-                    st.rerun()
-                else:
-                    st.warning("Le nom du client est requis.")
-
-            st.markdown("---")
-            st.markdown("**Ou importer une liste depuis un fichier CSV :**")
-            st.caption("Le fichier CSV doit contenir les colonnes : `nom` (ou `name`), `latitude` (ou `lat`), `longitude` (ou `lon`).")
-            uploaded_file = st.file_uploader("Fichier CSV", type=["csv"], key="csv_clients_uploader")
-            if uploaded_file is not None:
-                # Éviter de ré-importer le même fichier en boucle
-                file_id = f"{uploaded_file.name}_{uploaded_file.size}"
-                if st.session_state.get("last_imported_client_file") != file_id:
+            # Import CSV
+            st.markdown("**Ou importer via un fichier CSV** (colonnes : nom, latitude, longitude)")
+            m2_file = st.file_uploader("Fichier CSV", type=["csv"], key="m2_csv_uploader")
+            if m2_file is not None:
+                file_id = f"{m2_file.name}_{m2_file.size}"
+                if st.session_state.get("m2_last_file") != file_id:
                     try:
-                        df_clients = pd.read_csv(uploaded_file)
-                        
-                        # Normaliser les noms de colonnes
-                        df_clients.columns = [str(col).strip().lower() for col in df_clients.columns]
-                        
-                        # Chercher les colonnes correspondantes
-                        col_nom = next((col for col in df_clients.columns if col in ['nom', 'name', 'client', 'nom du client', 'nom_du_client']), None)
-                        col_lat = next((col for col in df_clients.columns if 'lat' in col), None)
-                        col_lon = next((col for col in df_clients.columns if 'lon' in col), None)
-
+                        df_m2 = pd.read_csv(m2_file)
+                        df_m2.columns = [str(c).strip().lower() for c in df_m2.columns]
+                        col_nom = next((c for c in df_m2.columns if c in ["nom", "name", "client"]), None)
+                        col_lat = next((c for c in df_m2.columns if "lat" in c), None)
+                        col_lon = next((c for c in df_m2.columns if "lon" in c), None)
                         if col_nom and col_lat and col_lon:
-                            added_count = 0
-                            for _, row in df_clients.iterrows():
-                                # Nettoyage minimal pour éviter les NaN ou chaînes vides
-                                name_val = str(row[col_nom]).strip()
-                                if pd.isna(row[col_lat]) or pd.isna(row[col_lon]) or not name_val or name_val == "nan":
+                            count = 0
+                            for _, row in df_m2.iterrows():
+                                n = str(row[col_nom]).strip()
+                                if pd.isna(row[col_lat]) or pd.isna(row[col_lon]) or not n or n == "nan":
                                     continue
-                                
-                                st.session_state["researcher_search_clients"].append(
-                                    {
-                                        "name": name_val,
-                                        "latitude": float(row[col_lat]),
-                                        "longitude": float(row[col_lon]),
-                                    }
+                                st.session_state["m2_clients"].append(
+                                    {"name": n, "latitude": float(row[col_lat]), "longitude": float(row[col_lon])}
                                 )
-                                added_count += 1
-                            
-                            if added_count > 0:
-                                st.session_state["last_imported_client_file"] = file_id
-                                st.success(f"✅ {added_count} clients importés avec succès !")
+                                count += 1
+                            if count > 0:
+                                st.session_state["m2_last_file"] = file_id
+                                st.success(f"✅ {count} clients importés.")
                                 st.rerun()
                         else:
-                            st.error("Le fichier CSV doit contenir les colonnes : nom, latitude, longitude. Colonnes trouvées : " + ", ".join(df_clients.columns))
+                            st.error("Colonnes requises : nom, latitude, longitude.")
                     except Exception as e:
-                        st.error(f"Erreur lors de la lecture du fichier CSV : {e}")
+                        st.error(f"Erreur de lecture : {e}")
 
-        # Division fermée par le contexte du conteneur
-
-
+        # ── Liste des clients saisis ────────────────────────────────────────
         with st.container(border=True):
-            header_col1, header_col2 = st.columns([7, 3])
-            with header_col1:
+            h_col1, h_col2 = st.columns([7, 3])
+            with h_col1:
                 st.markdown(
-                    f'### Mes clients <span class="mini-badge">{len(draft_clients)}</span>',
-                    unsafe_allow_html=True,
+                    f'### Mes clients <span class="mini-badge">{len(m2_clients)}</span>',
+                    unsafe_allow_html=True
                 )
-            with header_col2:
-                if draft_clients:
-                    if st.button("🗑️ Tout supprimer", key="clear_all_clients", use_container_width=True):
-                        try:
-                            execute_query("DELETE FROM delivery_points WHERE researcher_id = ?", (researcher_id,))
-                        except Exception:
-                            pass
-                        st.session_state["researcher_search_clients"] = []
+            with h_col2:
+                if m2_clients:
+                    if st.button("🗑️ Tout supprimer", key="m2_clear_all", use_container_width=True):
+                        st.session_state["m2_clients"] = []
                         st.rerun()
-            if not draft_clients:
-                st.info("Ajoute au moins un client pour alimenter la partie logistique.")
+
+            if not m2_clients:
+                st.info("Ajoutez au moins 2 clients pour calculer un point d'implantation.")
             else:
-                for idx, client in enumerate(draft_clients):
-                    info_col, action_col = st.columns([8, 2])
-                    with info_col:
+                for idx, client in enumerate(m2_clients):
+                    ci1, ci2 = st.columns([8, 2])
+                    with ci1:
                         st.markdown(
-                            f"""
-    <div class="list-item">
-        <div>
-            <div class="list-name">{client["name"]}</div>
-            <div class="list-meta">{client["latitude"]:.4f}, {client["longitude"]:.4f}</div>
-        </div>
-    </div>
-    """,
-                            unsafe_allow_html=True,
+                            f"""<div class="list-item">
+                                <div class="list-name">{client['name']}</div>
+                                <div class="list-meta">{client['latitude']:.4f}N · {client['longitude']:.4f}E</div>
+                            </div>""",
+                            unsafe_allow_html=True
                         )
-                    with action_col:
-                        if st.button("Suppr.", key=f"remove_client_{idx}", use_container_width=True):
-                            draft_clients.pop(idx)
-                            st.session_state["researcher_search_clients"] = draft_clients
+                    with ci2:
+                        if st.button("Suppr.", key=f"m2_del_{idx}", use_container_width=True):
+                            st.session_state["m2_clients"].pop(idx)
                             st.rerun()
 
-            prev_col, next_col = st.columns(2)
-            with prev_col:
-                if st.button("<- Precedent", key="back_to_warehouses", use_container_width=True):
-                    st.session_state["researcher_search_step"] = 2
-                    st.rerun()
-            with next_col:
-                if st.button("Suivant — Resultats ->", key="go_to_results_step", use_container_width=True):
-                    st.session_state["researcher_search_step"] = 4
-                    st.rerun()
-        # Division fermée par le contexte du conteneur
+        # ── Calcul Fermat-Weber ─────────────────────────────────────────────
+        if len(m2_clients) >= 2:
+            if st.button("🔍 Calculer le point optimal d'implantation", key="m2_run", type="primary", use_container_width=True):
+                pts = np.array([[c["latitude"], c["longitude"]] for c in m2_clients])
+                with st.spinner("Calcul en cours (méthode Fermat-Weber, solveur L-BFGS-B)..."):
+                    lat_opt, lon_opt, avg_dist = fermat_weber(pts)
+                st.session_state["m2_result"] = {"lat": lat_opt, "lon": lon_opt, "avg_dist": avg_dist}
 
+        # ── Affichage des résultats ────────────────────────────────────────
+        if "m2_result" in st.session_state and m2_clients:
+            res = st.session_state["m2_result"]
 
-    elif current_step == 4:
-        with st.container(border=True):
-            st.markdown("### Lancer l'analyse")
-        st.write(
-            f"Produit : **{st.session_state['researcher_search_product']}** | "
-            f"Entrepots saisis : **{len(draft_warehouses)}** | "
-            f"Clients saisis : **{len(draft_clients)}**"
-        )
-        st.write(
-            f"Volume : **{st.session_state['researcher_search_volume']:.1f} m3** | "
-            f"Duree : **{st.session_state['researcher_search_duration']} jour(s)**"
-        )
+            st.divider()
+            r1, r2, r3 = st.columns(3)
+            with r1:
+                st.metric("Latitude optimale", f"{res['lat']:.4f}°")
+            with r2:
+                st.metric("Longitude optimale", f"{res['lon']:.4f}°")
+            with r3:
+                st.metric("Distance moyenne (km)", f"{res['avg_dist']:.2f} km")
 
-        launch_disabled = False
-        is_quick = st.session_state.get("researcher_quick_search", False)
+            # Carte Folium
+            all_lats = [c["latitude"] for c in m2_clients] + [res["lat"]]
+            all_lons = [c["longitude"] for c in m2_clients] + [res["lon"]]
+            center_lat = sum(all_lats) / len(all_lats)
+            center_lon = sum(all_lons) / len(all_lons)
 
-        if is_quick:
-            st.info(
-                "🚀 **Mode recherche rapide** : la recherche va parcourir tous les entrepots "
-                "disponibles sur la plateforme et les classer par conformite au produit choisi. "
-                "Aucun entrepot ni point de livraison personnel n'est requis."
+            m2_map = folium.Map(location=[center_lat, center_lon], zoom_start=6)
+
+            # Points de livraison (Bleu)
+            for client in m2_clients:
+                folium.Marker(
+                    location=[client["latitude"], client["longitude"]],
+                    popup=client["name"],
+                    tooltip=client["name"],
+                    icon=folium.Icon(color="blue", icon="user", prefix="fa")
+                ).add_to(m2_map)
+
+            # Point optimal (Vert, plus grand, pulsant)
+            folium.Marker(
+                location=[res["lat"], res["lon"]],
+                popup=f"Point optimal : ({res['lat']:.4f}, {res['lon']:.4f})",
+                tooltip=f"📍 Implantation optimale — dist. moy. {res['avg_dist']:.2f} km",
+                icon=folium.Icon(color="green", icon="home", prefix="fa")
+            ).add_to(m2_map)
+
+            # Lignes de connexion (clients → point optimal)
+            for client in m2_clients:
+                folium.PolyLine(
+                    locations=[[client["latitude"], client["longitude"]], [res["lat"], res["lon"]]],
+                    color="gray",
+                    weight=1.5,
+                    opacity=0.6,
+                    dash_array="5"
+                ).add_to(m2_map)
+
+            st.markdown("#### Carte du Point d'Implantation Optimal")
+            st.markdown(
+                "<div style='display:flex;gap:15px;margin-bottom:10px;font-size:14px;flex-wrap:wrap;'>"
+                "<div style='display:flex;align-items:center;gap:5px;'><div style='width:12px;height:12px;background-color:#5cb85c;border-radius:50%;'></div> Point d'implantation optimal (Vert)</div>"
+                "<div style='display:flex;align-items:center;gap:5px;'><div style='width:12px;height:12px;background-color:#337ab7;border-radius:50%;'></div> Clients / Destinations (Bleu)</div>"
+                "</div>",
+                unsafe_allow_html=True
             )
-        else:
-            if not draft_warehouses and not draft_clients:
-                st.warning("Aucun entrepot ni client saisi. La recherche utilisera tous les entrepots de la plateforme.")
-            elif not draft_warehouses:
-                st.warning("Aucun entrepot personnel saisi — la plateforme sera utilisee comme source.")
-            elif not draft_clients:
-                st.info("Aucun point de livraison — le score sera base uniquement sur les conditions IoT.")
+            st_folium(m2_map, width=1200, height=500, returned_objects=[])
+    with tab1:
+        current_step = st.session_state["researcher_search_step"]
+        draft_warehouses = st.session_state["researcher_search_warehouses"]
+        draft_clients = st.session_state["researcher_search_clients"]
 
-        prev_col, run_col = st.columns(2)
-        with prev_col:
-            back_step = 1 if is_quick else 3
-            if st.button("<- Precedent", key="back_to_clients", use_container_width=True):
-                st.session_state["researcher_search_step"] = back_step
-                st.rerun()
-        with run_col:
-            run_search = st.button("Lancer l'analyse", key="run_search_new_ui", use_container_width=True, type="primary")
-
-        if run_search:
-            if draft_clients:
-                saved_points = sync_delivery_points(researcher_id, draft_clients)
-            else:
-                saved_points = 0
-            if draft_warehouses:
-                saved_warehouses = sync_my_warehouses(researcher_id, draft_warehouses)
-            else:
-                saved_warehouses = 0
-
-            with st.spinner("Analyse des historiques IoT en cours..."):
-                from core.logistique import classer_entrepots_logistique
-                compliant_warehouses = get_compliant_warehouses(
-                    st.session_state["researcher_search_product"]
-                )
-                suggestions = classer_entrepots_logistique(compliant_warehouses, researcher_id)
-
-            st.session_state["researcher_last_search"] = {
-                "product": st.session_state["researcher_search_product"],
-                "volume": st.session_state["researcher_search_volume"],
-                "duration_days": st.session_state["researcher_search_duration"],
-                "saved_points": saved_points,
-                "saved_warehouses": saved_warehouses,
-                "results": suggestions,
-            }
-            
-            # Sauvegarde en base de données pour l'historique
-            save_search_history(
-                researcher_id,
-                st.session_state["researcher_search_product"],
-                st.session_state["researcher_search_volume"],
-                st.session_state["researcher_search_duration"],
-                suggestions
-            )
-
-            st.success(
-                f"Analyse terminee. {saved_points} client(s) et {saved_warehouses} entrepot(s) ont ete enregistres."
-            )
-
-            if suggestions:
-                df_suggestions = pd.DataFrame(suggestions)
-                suggestion_columns = [
-                    c
-                    for c in [
-                        "nom",
-                        "score_logistique",
-                        "distance_km",
-                        "avg_temp",
-                        "avg_hum",
-                        "status",
-                    ]
-                    if c in df_suggestions.columns
-                ]
-                st.dataframe(
-                    df_suggestions[suggestion_columns],
-                    column_config={
-                        "nom": "Nom de l'entrepot",
-                        "score_logistique": st.column_config.NumberColumn("Score logistique", format="%.2f"),
-                        "distance_km": st.column_config.NumberColumn("Distance (km)", format="%.2f"),
-                        "avg_temp": st.column_config.NumberColumn("Temperature moyenne", format="%.1f C"),
-                        "avg_hum": st.column_config.NumberColumn("Humidite moyenne", format="%.1f %%"),
-                        "status": "Statut",
-                    },
+        st.markdown('<div class="wizard-shell">', unsafe_allow_html=True)
+        step_cols = st.columns(4)
+        step_labels = ["Produit", "Entrepots", "Clients", "Resultats"]
+        for idx, label in enumerate(step_labels, start=1):
+            with step_cols[idx - 1]:
+                if st.button(
+                    f"{idx:02d}\n{label}",
+                    key=f"wizard_step_{idx}",
                     use_container_width=True,
-                    hide_index=True,
-                )
-                
-                # Render Map
-                current_clients_df = pd.DataFrame(st.session_state.get("researcher_search_clients", []))
-                current_my_warehouses_df = pd.DataFrame(st.session_state.get("researcher_search_warehouses", []))
-                render_map(df_suggestions, current_my_warehouses_df, current_clients_df)
-
-                render_contact_owner_section(
-                    df_results=df_suggestions,
-                    product_name=st.session_state["researcher_search_product"],
-                    current_researcher_id=researcher_id,
-                )
-                if st.button("Ouvrir l'espace resultats", key="goto_results_from_wizard"):
-                    set_view("results")
+                    type="primary" if current_step == idx else "secondary",
+                ):
+                    st.session_state["researcher_search_step"] = idx
                     st.rerun()
+                # Label supprimé ici car répété dans le titre de la section
+
+        if current_step == 1:
+            with st.container(border=True):
+                st.markdown("### Parametres produit")
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.session_state["researcher_search_product"] = st.selectbox(
+                        "Produit",
+                        options=list(PRODUCT_CONDITIONS.keys()),
+                        index=list(PRODUCT_CONDITIONS.keys()).index(st.session_state["researcher_search_product"]),
+                    )
+                with c2:
+                    st.session_state["researcher_search_volume"] = st.number_input(
+                        "Volume total (m3)",
+                        min_value=0.0,
+                        step=0.1,
+                        value=float(st.session_state["researcher_search_volume"]),
+                    )
+
+                st.session_state["researcher_search_duration"] = st.number_input(
+                    "Duree de stockage estimee (jours)",
+                    min_value=1,
+                    max_value=365,
+                    value=int(st.session_state["researcher_search_duration"]),
+                )
+
+                st.divider()
+                col_next, col_quick = st.columns(2)
+                with col_next:
+                    if st.button("Suivant — Entrepots ->", key="go_to_warehouses_first", use_container_width=True):
+                        st.session_state["researcher_quick_search"] = False
+                        st.session_state["researcher_search_step"] = 2
+                        st.rerun()
+                with col_quick:
+                    if st.button("🚀 Recherche rapide (produit uniquement)", key="go_quick_search", use_container_width=True, type="primary"):
+                        st.session_state["researcher_quick_search"] = True
+                        st.session_state["researcher_search_step"] = 4
+                        st.rerun()
+                    st.markdown(
+                        '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;font-size:13px;color:#1e40af;">'
+                        "<b>Mode rapide</b> : chercher parmi tous les entrepots de la plateforme "
+                        "sans entrer d'entrepots ou de clients."
+                        "</div>",
+                        unsafe_allow_html=True,
+                    )
+
+            # Fin de l'étape 1
+
+        elif current_step == 2:
+            with st.container(border=True):
+                st.markdown("### Ajouter un entrepot existant")
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    warehouse_name = st.text_input("Nom", key="draft_wh_name", placeholder="Entrepot Nord Casablanca")
+                with c2:
+                    warehouse_address = st.text_input("Adresse / Ville", key="draft_wh_address", placeholder="Ain Sebaa, Casablanca")
+
+                c3, c4, c5 = st.columns(3)
+                with c3:
+                    warehouse_lat = st.number_input("Latitude", key="draft_wh_lat", format="%.4f", value=33.57)
+                with c4:
+                    warehouse_lon = st.number_input("Longitude", key="draft_wh_lon", format="%.4f", value=-7.59)
+                with c5:
+                    warehouse_volume = st.number_input("Volume (m3)", key="draft_wh_volume", min_value=0.0, value=5000.0, step=100.0)
+
+                if st.button("+ Ajouter", key="add_draft_warehouse"):
+                    if warehouse_name.strip() and warehouse_address.strip():
+                        draft_warehouses.append(
+                            {
+                                "id_entrepot": str(uuid.uuid4())[:8].upper(),
+                                "nom": warehouse_name.strip(),
+                                "adresse": warehouse_address.strip(),
+                                "latitude": float(warehouse_lat),
+                                "longitude": float(warehouse_lon),
+                                "volume_m3": float(warehouse_volume),
+                            }
+                        )
+                        st.session_state["researcher_search_warehouses"] = draft_warehouses
+                        st.rerun()
+                    else:
+                        st.warning("Le nom et l'adresse sont requis pour ajouter un entrepot.")
+
+            # Wizard card closing handled by container
+
+
+            with st.container(border=True):
+                st.markdown(
+                    f'### Mes entrepots <span class="mini-badge">{len(draft_warehouses)}</span>',
+                    unsafe_allow_html=True,
+                )
+                if not draft_warehouses:
+                    st.info("Ajoute au moins un entrepot pour continuer.")
+                else:
+                    for idx, warehouse in enumerate(draft_warehouses):
+                        info_col, action_col = st.columns([8, 2])
+                        with info_col:
+                            st.markdown(
+                                f"""
+        <div class="list-item">
+            <div>
+                <div class="list-name">{warehouse["nom"]}</div>
+                <div class="list-meta">{warehouse["adresse"]} · {warehouse["latitude"]:.2f}N · {warehouse["longitude"]:.2f}E · {warehouse["volume_m3"]:.0f} m3</div>
+            </div>
+        </div>
+        """,
+                                unsafe_allow_html=True,
+                            )
+                        with action_col:
+                            if st.button("Suppr.", key=f"remove_wh_{idx}", use_container_width=True):
+                                draft_warehouses.pop(idx)
+                                st.session_state["researcher_search_warehouses"] = draft_warehouses
+                                st.rerun()
+                prev_col, next_col, skip_col = st.columns(3)
+                with prev_col:
+                    if st.button("<- Precedent", key="back_to_product_first", use_container_width=True):
+                        st.session_state["researcher_search_step"] = 1
+                        st.rerun()
+                with next_col:
+                    if st.button("Suivant — Clients ->", key="go_to_clients", use_container_width=True):
+                        st.session_state["researcher_quick_search"] = False
+                        st.session_state["researcher_search_step"] = 3
+                        st.rerun()
+                with skip_col:
+                    if st.button("Passer aux Resultats ->", key="skip_to_results_from_wh", use_container_width=True):
+                        st.session_state["researcher_quick_search"] = False
+                        st.session_state["researcher_search_step"] = 4
+                        st.rerun()
+            # Division fermée par le contexte du conteneur
+
+
+        elif current_step == 3:
+            with st.container(border=True):
+                st.markdown("### Ajouter un client / point de livraison")
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    client_name = st.text_input("Nom du client", key="draft_client_name", placeholder="Client Beni Mellal")
+                with c2:
+                    client_lat = st.number_input("Latitude client", key="draft_client_lat", format="%.4f", value=32.6667)
+                with c3:
+                    client_lon = st.number_input("Longitude client", key="draft_client_lon", format="%.4f", value=-6.35)
+
+                if st.button("+ Ajouter client", key="add_draft_client"):
+                    if client_name.strip():
+                        draft_clients.append(
+                            {
+                                "name": client_name.strip(),
+                                "latitude": float(client_lat),
+                                "longitude": float(client_lon),
+                            }
+                        )
+                        st.session_state["researcher_search_clients"] = draft_clients
+                        st.rerun()
+                    else:
+                        st.warning("Le nom du client est requis.")
+
+                st.markdown("---")
+                st.markdown("**Ou importer une liste depuis un fichier CSV :**")
+                st.caption("Le fichier CSV doit contenir les colonnes : `nom` (ou `name`), `latitude` (ou `lat`), `longitude` (ou `lon`).")
+                uploaded_file = st.file_uploader("Fichier CSV", type=["csv"], key="csv_clients_uploader")
+                if uploaded_file is not None:
+                    # Éviter de ré-importer le même fichier en boucle
+                    file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+                    if st.session_state.get("last_imported_client_file") != file_id:
+                        try:
+                            df_clients = pd.read_csv(uploaded_file)
+                        
+                            # Normaliser les noms de colonnes
+                            df_clients.columns = [str(col).strip().lower() for col in df_clients.columns]
+                        
+                            # Chercher les colonnes correspondantes
+                            col_nom = next((col for col in df_clients.columns if col in ['nom', 'name', 'client', 'nom du client', 'nom_du_client']), None)
+                            col_lat = next((col for col in df_clients.columns if 'lat' in col), None)
+                            col_lon = next((col for col in df_clients.columns if 'lon' in col), None)
+
+                            if col_nom and col_lat and col_lon:
+                                added_count = 0
+                                for _, row in df_clients.iterrows():
+                                    # Nettoyage minimal pour éviter les NaN ou chaînes vides
+                                    name_val = str(row[col_nom]).strip()
+                                    if pd.isna(row[col_lat]) or pd.isna(row[col_lon]) or not name_val or name_val == "nan":
+                                        continue
+                                
+                                    st.session_state["researcher_search_clients"].append(
+                                        {
+                                            "name": name_val,
+                                            "latitude": float(row[col_lat]),
+                                            "longitude": float(row[col_lon]),
+                                        }
+                                    )
+                                    added_count += 1
+                            
+                                if added_count > 0:
+                                    st.session_state["last_imported_client_file"] = file_id
+                                    st.success(f"✅ {added_count} clients importés avec succès !")
+                                    st.rerun()
+                            else:
+                                st.error("Le fichier CSV doit contenir les colonnes : nom, latitude, longitude. Colonnes trouvées : " + ", ".join(df_clients.columns))
+                        except Exception as e:
+                            st.error(f"Erreur lors de la lecture du fichier CSV : {e}")
+
+            # Division fermée par le contexte du conteneur
+
+
+            with st.container(border=True):
+                header_col1, header_col2 = st.columns([7, 3])
+                with header_col1:
+                    st.markdown(
+                        f'### Mes clients <span class="mini-badge">{len(draft_clients)}</span>',
+                        unsafe_allow_html=True,
+                    )
+                with header_col2:
+                    if draft_clients:
+                        if st.button("🗑️ Tout supprimer", key="clear_all_clients", use_container_width=True):
+                            try:
+                                execute_query("DELETE FROM delivery_points WHERE researcher_id = ?", (researcher_id,))
+                            except Exception:
+                                pass
+                            st.session_state["researcher_search_clients"] = []
+                            st.rerun()
+                if not draft_clients:
+                    st.info("Ajoute au moins un client pour alimenter la partie logistique.")
+                else:
+                    for idx, client in enumerate(draft_clients):
+                        info_col, action_col = st.columns([8, 2])
+                        with info_col:
+                            st.markdown(
+                                f"""
+        <div class="list-item">
+            <div>
+                <div class="list-name">{client["name"]}</div>
+                <div class="list-meta">{client["latitude"]:.4f}, {client["longitude"]:.4f}</div>
+            </div>
+        </div>
+        """,
+                                unsafe_allow_html=True,
+                            )
+                        with action_col:
+                            if st.button("Suppr.", key=f"remove_client_{idx}", use_container_width=True):
+                                draft_clients.pop(idx)
+                                st.session_state["researcher_search_clients"] = draft_clients
+                                st.rerun()
+
+                prev_col, next_col = st.columns(2)
+                with prev_col:
+                    if st.button("<- Precedent", key="back_to_warehouses", use_container_width=True):
+                        st.session_state["researcher_search_step"] = 2
+                        st.rerun()
+                with next_col:
+                    if st.button("Suivant — Resultats ->", key="go_to_results_step", use_container_width=True):
+                        st.session_state["researcher_search_step"] = 4
+                        st.rerun()
+            # Division fermée par le contexte du conteneur
+
+
+        elif current_step == 4:
+            with st.container(border=True):
+                st.markdown("### Lancer l'analyse")
+            st.write(
+                f"Produit : **{st.session_state['researcher_search_product']}** | "
+                f"Entrepots saisis : **{len(draft_warehouses)}** | "
+                f"Clients saisis : **{len(draft_clients)}**"
+            )
+            st.write(
+                f"Volume : **{st.session_state['researcher_search_volume']:.1f} m3** | "
+                f"Duree : **{st.session_state['researcher_search_duration']} jour(s)**"
+            )
+
+            launch_disabled = False
+            is_quick = st.session_state.get("researcher_quick_search", False)
+
+            if is_quick:
+                st.info(
+                    "🚀 **Mode recherche rapide** : la recherche va parcourir tous les entrepots "
+                    "disponibles sur la plateforme et les classer par conformite au produit choisi. "
+                    "Aucun entrepot ni point de livraison personnel n'est requis."
+                )
             else:
-                st.warning("Aucun entrepot conforme n'a ete trouve pour cette recherche.")
+                if not draft_warehouses and not draft_clients:
+                    st.warning("Aucun entrepot ni client saisi. La recherche utilisera tous les entrepots de la plateforme.")
+                elif not draft_warehouses:
+                    st.warning("Aucun entrepot personnel saisi — la plateforme sera utilisee comme source.")
+                elif not draft_clients:
+                    st.info("Aucun point de livraison — le score sera base uniquement sur les conditions IoT.")
 
-        # Division fermée par le contexte du conteneur
+            prev_col, run_col = st.columns(2)
+            with prev_col:
+                back_step = 1 if is_quick else 3
+                if st.button("<- Precedent", key="back_to_clients", use_container_width=True):
+                    st.session_state["researcher_search_step"] = back_step
+                    st.rerun()
+            with run_col:
+                run_search = st.button("Lancer l'analyse", key="run_search_new_ui", use_container_width=True, type="primary")
+
+            if run_search:
+                if draft_clients:
+                    saved_points = sync_delivery_points(researcher_id, draft_clients)
+                else:
+                    saved_points = 0
+                if draft_warehouses:
+                    saved_warehouses = sync_my_warehouses(researcher_id, draft_warehouses)
+                else:
+                    saved_warehouses = 0
+
+                with st.spinner("Analyse des historiques IoT en cours..."):
+                    from core.logistique import classer_entrepots_logistique
+                    compliant_warehouses = get_compliant_warehouses(
+                        st.session_state["researcher_search_product"]
+                    )
+                    suggestions = classer_entrepots_logistique(compliant_warehouses, researcher_id)
+
+                st.session_state["researcher_last_search"] = {
+                    "product": st.session_state["researcher_search_product"],
+                    "volume": st.session_state["researcher_search_volume"],
+                    "duration_days": st.session_state["researcher_search_duration"],
+                    "saved_points": saved_points,
+                    "saved_warehouses": saved_warehouses,
+                    "results": suggestions,
+                }
+            
+                # Sauvegarde en base de données pour l'historique
+                save_search_history(
+                    researcher_id,
+                    st.session_state["researcher_search_product"],
+                    st.session_state["researcher_search_volume"],
+                    st.session_state["researcher_search_duration"],
+                    suggestions
+                )
+
+                st.success(
+                    f"Analyse terminee. {saved_points} client(s) et {saved_warehouses} entrepot(s) ont ete enregistres."
+                )
+
+                if suggestions:
+                    df_suggestions = pd.DataFrame(suggestions)
+                    suggestion_columns = [
+                        c
+                        for c in [
+                            "nom",
+                            "score_logistique",
+                            "distance_km",
+                            "avg_temp",
+                            "avg_hum",
+                            "status",
+                        ]
+                        if c in df_suggestions.columns
+                    ]
+                    st.dataframe(
+                        df_suggestions[suggestion_columns],
+                        column_config={
+                            "nom": "Nom de l'entrepot",
+                            "score_logistique": st.column_config.NumberColumn("Score logistique", format="%.2f"),
+                            "distance_km": st.column_config.NumberColumn("Distance (km)", format="%.2f"),
+                            "avg_temp": st.column_config.NumberColumn("Temperature moyenne", format="%.1f C"),
+                            "avg_hum": st.column_config.NumberColumn("Humidite moyenne", format="%.1f %%"),
+                            "status": "Statut",
+                        },
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                
+                    # Render Map
+                    current_clients_df = pd.DataFrame(st.session_state.get("researcher_search_clients", []))
+                    current_my_warehouses_df = pd.DataFrame(st.session_state.get("researcher_search_warehouses", []))
+                    render_map(df_suggestions, current_my_warehouses_df, current_clients_df)
+
+                    render_contact_owner_section(
+                        df_results=df_suggestions,
+                        product_name=st.session_state["researcher_search_product"],
+                        current_researcher_id=researcher_id,
+                    )
+                    if st.button("Ouvrir l'espace resultats", key="goto_results_from_wizard"):
+                        set_view("results")
+                        st.rerun()
+                else:
+                    st.warning("Aucun entrepot conforme n'a ete trouve pour cette recherche.")
+
+            # Division fermée par le contexte du conteneur
 
 
-    # Fin de la vue recherche
+        # Fin de la vue recherche
 
 
 
