@@ -241,3 +241,6 @@ if st.session_state.get('show_demo', False):
     if st.button("Fermer le guide"):
         st.session_state.show_demo = False
         st.rerun()
+# --- Chatbot Flottant ---
+from components.chatbot import render_optibot
+render_optibot()

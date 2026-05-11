@@ -220,3 +220,8 @@ if st.button("🚪 Se déconnecter", key="logout_btn"):
     st.switch_page("app.py")
 st.write("")
 st.caption("OptiStock — Warehouse Monitoring Dashboard")
+
+# Rendu du chatbot OptiBot
+from components.chatbot import render_optibot
+render_optibot()
+

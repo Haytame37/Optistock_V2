@@ -30,6 +30,10 @@ def create_user(role, first_name, last_name, email, password):
         )
         conn.commit()
         return True, None
+    except sqlite3.IntegrityError as e:
+        if "UNIQUE constraint failed: users.email" in str(e):
+            return False, "Cette adresse e-mail est déjà utilisée. Veuillez vous connecter ou en utiliser une autre."
+        return False, str(e)
     except Exception as e:
         print(f"Error creating user: {e}")
         return False, str(e)

@@ -1668,3 +1668,7 @@ st.write("")
 if st.button("🚪 Se déconnecter", key="logout_researcher"):
     st.session_state.clear()
     st.switch_page("app.py")
+
+# Rendu du chatbot OptiBot
+from components.chatbot import render_optibot
+render_optibot()

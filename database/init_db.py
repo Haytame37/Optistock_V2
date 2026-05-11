@@ -37,7 +37,7 @@ def create_database():
             role TEXT NOT NULL CHECK(role IN ('admin', 'researcher', 'owner')),
             first_name TEXT NOT NULL,
             last_name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
+            email TEXT NOT NULL,
             password_hash TEXT NOT NULL,
             is_active INTEGER DEFAULT 1 CHECK(is_active IN (0, 1)),
             created_at DATETIME DEFAULT (datetime('now', '+1 hours')),
