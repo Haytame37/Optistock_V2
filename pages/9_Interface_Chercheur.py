@@ -3,6 +3,8 @@ import uuid
 
 import pandas as pd
 import streamlit as st
+import folium
+from streamlit_folium import st_folium
 
 from core.iot_filter import get_compliant_warehouses
 from core.messaging import (
@@ -115,6 +117,96 @@ def load_researcher_discussions(current_researcher_id: int) -> pd.DataFrame:
     return get_researcher_requests(current_researcher_id)
 
 
+def render_map(df_results: pd.DataFrame, df_my_warehouses: pd.DataFrame, df_clients: pd.DataFrame) -> None:
+    all_lats, all_lons = [], []
+    
+    # Process results (Green)
+    df_res = pd.DataFrame()
+    if not df_results.empty:
+        df_res = df_results.copy()
+        df_res['latitude'] = pd.to_numeric(df_res['latitude'], errors='coerce')
+        df_res['longitude'] = pd.to_numeric(df_res['longitude'], errors='coerce')
+        df_res = df_res.dropna(subset=['latitude', 'longitude'])
+        if not df_res.empty:
+            all_lats.extend(df_res['latitude'].tolist())
+            all_lons.extend(df_res['longitude'].tolist())
+            
+    # Process my warehouses (Red)
+    df_my = pd.DataFrame()
+    if not df_my_warehouses.empty:
+        df_my = df_my_warehouses.copy()
+        df_my['latitude'] = pd.to_numeric(df_my['latitude'], errors='coerce')
+        df_my['longitude'] = pd.to_numeric(df_my['longitude'], errors='coerce')
+        df_my = df_my.dropna(subset=['latitude', 'longitude'])
+        if not df_my.empty:
+            all_lats.extend(df_my['latitude'].tolist())
+            all_lons.extend(df_my['longitude'].tolist())
+
+    # Process clients (Blue)
+    df_c = pd.DataFrame()
+    if not df_clients.empty:
+        df_c = df_clients.copy()
+        df_c['latitude'] = pd.to_numeric(df_c['latitude'], errors='coerce')
+        df_c['longitude'] = pd.to_numeric(df_c['longitude'], errors='coerce')
+        df_c = df_c.dropna(subset=['latitude', 'longitude'])
+        if not df_c.empty:
+            all_lats.extend(df_c['latitude'].tolist())
+            all_lons.extend(df_c['longitude'].tolist())
+
+    if not all_lats:
+        return
+        
+    center_lat = sum(all_lats) / len(all_lats) if all_lats else 31.7917
+    center_lon = sum(all_lons) / len(all_lons) if all_lons else -7.0926
+
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=6)
+
+    # Clients (Bleu) - Tracé en premier pour être au fond
+    if not df_c.empty:
+        for _, row in df_c.iterrows():
+            name = str(row.get('name', 'Client'))
+            folium.Marker(
+                location=[row['latitude'], row['longitude']],
+                popup=name,
+                tooltip=name,
+                icon=folium.Icon(color="blue", icon="user", prefix="fa")
+            ).add_to(m)
+
+    # Entrepôts importés (Rouge) - Tracé en deuxième
+    if not df_my.empty:
+        for _, row in df_my.iterrows():
+            nom = str(row.get('nom', 'Mon Entrepôt'))
+            folium.Marker(
+                location=[row['latitude'], row['longitude']],
+                popup=nom,
+                tooltip=nom,
+                icon=folium.Icon(color="red", icon="building", prefix="fa")
+            ).add_to(m)
+
+    # Entrepôts résultats (Vert) - Tracé en dernier pour être au-dessus
+    if not df_res.empty:
+        for _, row in df_res.iterrows():
+            nom = str(row.get('nom', 'Entrepôt (Résultat)'))
+            folium.Marker(
+                location=[row['latitude'], row['longitude']],
+                popup=nom,
+                tooltip=nom,
+                icon=folium.Icon(color="green", icon="check", prefix="fa")
+            ).add_to(m)
+
+    st.markdown("#### Carte du Réseau Logistique")
+    st.markdown(
+        "<div style='display: flex; gap: 15px; margin-bottom: 10px; font-size: 14px; flex-wrap: wrap;'>"
+        "<div style='display: flex; align-items: center; gap: 5px;'><div style='width: 12px; height: 12px; background-color: #5cb85c; border-radius: 50%;'></div> Résultats d'Analyse (Vert)</div>"
+        "<div style='display: flex; align-items: center; gap: 5px;'><div style='width: 12px; height: 12px; background-color: #d9534f; border-radius: 50%;'></div> Mes Entrepôts Importés (Rouge)</div>"
+        "<div style='display: flex; align-items: center; gap: 5px;'><div style='width: 12px; height: 12px; background-color: #337ab7; border-radius: 50%;'></div> Clients / Destinations (Bleu)</div>"
+        "</div>",
+        unsafe_allow_html=True
+    )
+    
+    st_folium(m, width=1200, height=500, returned_objects=[])
+
+
 def render_contact_owner_section(df_results: pd.DataFrame, product_name: str, current_researcher_id: int) -> None:
     st.write("")
     st.markdown("### Contacter un proprietaire")
@@ -128,7 +220,6 @@ def render_contact_owner_section(df_results: pd.DataFrame, product_name: str, cu
         with st.container(border=True):
             st.markdown(
                 f"**{warehouse_name}**  \n"
-                f"Type: `{row.get('type_stockage', 'n/a')}` | "
                 f"Score logistique: `{row.get('score_logistique', 'n/a')}`"
             )
             default_message = (
@@ -814,10 +905,21 @@ if current_view == "search":
 
 
         with st.container(border=True):
-            st.markdown(
-                f'### Mes clients <span class="mini-badge">{len(draft_clients)}</span>',
-                unsafe_allow_html=True,
-            )
+            header_col1, header_col2 = st.columns([7, 3])
+            with header_col1:
+                st.markdown(
+                    f'### Mes clients <span class="mini-badge">{len(draft_clients)}</span>',
+                    unsafe_allow_html=True,
+                )
+            with header_col2:
+                if draft_clients:
+                    if st.button("🗑️ Tout supprimer", key="clear_all_clients", use_container_width=True):
+                        try:
+                            execute_query("DELETE FROM delivery_points WHERE researcher_id = ?", (researcher_id,))
+                        except Exception:
+                            pass
+                        st.session_state["researcher_search_clients"] = []
+                        st.rerun()
             if not draft_clients:
                 st.info("Ajoute au moins un client pour alimenter la partie logistique.")
             else:
@@ -937,7 +1039,6 @@ if current_view == "search":
                     c
                     for c in [
                         "nom",
-                        "type_stockage",
                         "score_logistique",
                         "distance_km",
                         "avg_temp",
@@ -950,7 +1051,6 @@ if current_view == "search":
                     df_suggestions[suggestion_columns],
                     column_config={
                         "nom": "Nom de l'entrepot",
-                        "type_stockage": "Type logistique",
                         "score_logistique": st.column_config.NumberColumn("Score logistique", format="%.2f"),
                         "distance_km": st.column_config.NumberColumn("Distance (km)", format="%.2f"),
                         "avg_temp": st.column_config.NumberColumn("Temperature moyenne", format="%.1f C"),
@@ -960,6 +1060,12 @@ if current_view == "search":
                     use_container_width=True,
                     hide_index=True,
                 )
+                
+                # Render Map
+                current_clients_df = pd.DataFrame(st.session_state.get("researcher_search_clients", []))
+                current_my_warehouses_df = pd.DataFrame(st.session_state.get("researcher_search_warehouses", []))
+                render_map(df_suggestions, current_my_warehouses_df, current_clients_df)
+
                 render_contact_owner_section(
                     df_results=df_suggestions,
                     product_name=st.session_state["researcher_search_product"],
@@ -1048,12 +1154,15 @@ if current_view == "results":
             df_results = pd.DataFrame(results_snapshot["results"])
             preferred_columns = [
                 c for c in [
-                    "nom", "type_stockage", "score_logistique", "distance_km", 
+                    "nom", "score_logistique", "distance_km", 
                     "avg_temp", "avg_hum", "status"
                 ] if c in df_results.columns
             ]
             st.dataframe(df_results[preferred_columns], use_container_width=True, hide_index=True)
             
+            # Render Map
+            render_map(df_results, my_warehouses_df, delivery_points_df)
+
             st.markdown("#### Contacter les propriétaires")
             render_contact_owner_section(
                 df_results=df_results,
