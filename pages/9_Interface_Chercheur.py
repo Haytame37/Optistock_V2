@@ -770,45 +770,45 @@ if current_view == "search":
             st.caption("Le fichier CSV doit contenir les colonnes : `nom` (ou `name`), `latitude` (ou `lat`), `longitude` (ou `lon`).")
             uploaded_file = st.file_uploader("Fichier CSV", type=["csv"], key="csv_clients_uploader")
             if uploaded_file is not None:
-                try:
-                    df_clients = pd.read_csv(uploaded_file)
-                    
-                    # Normaliser les noms de colonnes
-                    df_clients.columns = [str(col).strip().lower() for col in df_clients.columns]
-                    
-                    # Chercher les colonnes correspondantes
-                    col_nom = next((col for col in df_clients.columns if col in ['nom', 'name', 'client', 'nom du client', 'nom_du_client']), None)
-                    col_lat = next((col for col in df_clients.columns if 'lat' in col), None)
-                    col_lon = next((col for col in df_clients.columns if 'lon' in col), None)
-
-                    if col_nom and col_lat and col_lon:
-                        added_count = 0
-                        for _, row in df_clients.iterrows():
-                            # Nettoyage minimal pour éviter les NaN ou chaînes vides
-                            name_val = str(row[col_nom]).strip()
-                            if pd.isna(row[col_lat]) or pd.isna(row[col_lon]) or not name_val or name_val == "nan":
-                                continue
-                            
-                            draft_clients.append(
-                                {
-                                    "name": name_val,
-                                    "latitude": float(row[col_lat]),
-                                    "longitude": float(row[col_lon]),
-                                }
-                            )
-                            added_count += 1
+                # Éviter de ré-importer le même fichier en boucle
+                file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+                if st.session_state.get("last_imported_client_file") != file_id:
+                    try:
+                        df_clients = pd.read_csv(uploaded_file)
                         
-                        if added_count > 0:
-                            st.session_state["researcher_search_clients"] = draft_clients
-                            st.success(f"✅ {added_count} clients importés avec succès !")
-                            # st.rerun() n'est pas appelé immédiatement ici pour laisser l'utilisateur voir le message de succès s'il le souhaite,
-                            # ou on peut rerun mais il perdra le message. Utilisons un sleep léger ou laissons l'utilisateur cliquer sur "Suivant".
-                            # Un rerun rafraîchit la page et affiche les clients en dessous.
-                            st.rerun()
-                    else:
-                        st.error("Le fichier CSV doit contenir les colonnes : nom, latitude, longitude. Colonnes trouvées : " + ", ".join(df_clients.columns))
-                except Exception as e:
-                    st.error(f"Erreur lors de la lecture du fichier CSV : {e}")
+                        # Normaliser les noms de colonnes
+                        df_clients.columns = [str(col).strip().lower() for col in df_clients.columns]
+                        
+                        # Chercher les colonnes correspondantes
+                        col_nom = next((col for col in df_clients.columns if col in ['nom', 'name', 'client', 'nom du client', 'nom_du_client']), None)
+                        col_lat = next((col for col in df_clients.columns if 'lat' in col), None)
+                        col_lon = next((col for col in df_clients.columns if 'lon' in col), None)
+
+                        if col_nom and col_lat and col_lon:
+                            added_count = 0
+                            for _, row in df_clients.iterrows():
+                                # Nettoyage minimal pour éviter les NaN ou chaînes vides
+                                name_val = str(row[col_nom]).strip()
+                                if pd.isna(row[col_lat]) or pd.isna(row[col_lon]) or not name_val or name_val == "nan":
+                                    continue
+                                
+                                st.session_state["researcher_search_clients"].append(
+                                    {
+                                        "name": name_val,
+                                        "latitude": float(row[col_lat]),
+                                        "longitude": float(row[col_lon]),
+                                    }
+                                )
+                                added_count += 1
+                            
+                            if added_count > 0:
+                                st.session_state["last_imported_client_file"] = file_id
+                                st.success(f"✅ {added_count} clients importés avec succès !")
+                                st.rerun()
+                        else:
+                            st.error("Le fichier CSV doit contenir les colonnes : nom, latitude, longitude. Colonnes trouvées : " + ", ".join(df_clients.columns))
+                    except Exception as e:
+                        st.error(f"Erreur lors de la lecture du fichier CSV : {e}")
 
         # Division fermée par le contexte du conteneur
 
