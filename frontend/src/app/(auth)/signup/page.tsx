@@ -157,14 +157,23 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Confirmer le mot de passe</label>
-              <Input
-                className="rounded-xl"
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
-                value={form.confirm_password}
-                onChange={(e) => setForm({ ...form, confirm_password: e.target.value })}
-                required
-              />
+              <div className="relative">
+                <Input
+                  className="rounded-xl pr-10"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={form.confirm_password}
+                  onChange={(e) => setForm({ ...form, confirm_password: e.target.value })}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
