@@ -27,7 +27,21 @@ export default function LoginPage() {
     try {
       await login({ email, password })
       toast.success("Connexion réussie")
-      router.push("/researcher")
+      
+      // Récupérer le rôle de l'utilisateur depuis le localStorage (car login() ne renvoie pas l'user directement)
+      const userStr = localStorage.getItem("user")
+      if (userStr) {
+        const userObj = JSON.parse(userStr)
+        if (userObj.role === "owner") {
+          router.push("/owner")
+        } else if (userObj.role === "admin") {
+          router.push("/admin")
+        } else {
+          router.push("/researcher")
+        }
+      } else {
+        router.push("/researcher")
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Identifiants incorrects")
     } finally {

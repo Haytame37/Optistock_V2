@@ -7,11 +7,16 @@ export const metadata: Metadata = {
   description: "Système d'Aide à la Décision Logistique",
 }
 
+import { ChatbotWidget } from "@/components/ui/chatbot"
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className="min-h-screen">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <ChatbotWidget />
+        </Providers>
       </body>
     </html>
   )

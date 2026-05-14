@@ -56,28 +56,33 @@ def get_compliant_warehouses(product_name):
         )
 
         if df_iot.empty:
-            continue
-
-        temp_series = df_iot[["temp_sensor_1", "temp_sensor_2", "temp_sensor_3"]].mean(axis=1)
-        hum_series = df_iot[["hum_sensor_1", "hum_sensor_2", "hum_sensor_3"]].mean(axis=1)
-
-        avg_temp = float(temp_series.mean())
-        avg_hum = float(hum_series.mean())
-
-        if ignore_environment:
+            # Si pas de données IoT, on considère l'entrepôt comme potentiellement conforme 
+            # mais on ne peut pas vérifier les contraintes. On l'ajoute quand même.
+            avg_temp = 20.0 # Valeur par défaut neutre
+            avg_hum = 50.0  # Valeur par défaut neutre
             temp_ok = True
             hum_ok = True
         else:
-            temp_ok = (
-                conditions["temperature"]["min"] + conditions["temperature"]["marge_bas"]
-                <= avg_temp
-                <= conditions["temperature"]["max"] + conditions["temperature"]["marge_haut"]
-            )
-            hum_ok = (
-                conditions["humidite"]["min"] + conditions["humidite"]["marge_bas"]
-                <= avg_hum
-                <= conditions["humidite"]["max"] + conditions["humidite"]["marge_haut"]
-            )
+            temp_series = df_iot[["temp_sensor_1", "temp_sensor_2", "temp_sensor_3"]].mean(axis=1)
+            hum_series = df_iot[["hum_sensor_1", "hum_sensor_2", "hum_sensor_3"]].mean(axis=1)
+
+            avg_temp = float(temp_series.mean())
+            avg_hum = float(hum_series.mean())
+
+            if ignore_environment:
+                temp_ok = True
+                hum_ok = True
+            else:
+                temp_ok = (
+                    conditions["temperature"]["min"] + conditions["temperature"]["marge_bas"]
+                    <= avg_temp
+                    <= conditions["temperature"]["max"] + conditions["temperature"]["marge_haut"]
+                )
+                hum_ok = (
+                    conditions["humidite"]["min"] + conditions["humidite"]["marge_bas"]
+                    <= avg_hum
+                    <= conditions["humidite"]["max"] + conditions["humidite"]["marge_haut"]
+                )
 
         if not (temp_ok and hum_ok):
             continue

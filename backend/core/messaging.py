@@ -244,3 +244,68 @@ def send_chat_message(request_id: str, sender_id: int, sender_role: str, message
     conn.commit()
     conn.close()
     return True, "Message envoye."
+
+
+def create_rental_offer(request_id: str, owner_id: int, price: float, start_date: str) -> tuple[bool, str]:
+    """Cree une offre de location (reservation pending) et envoie un message special."""
+    ensure_messaging_schema()
+    
+    # Recupérer les infos de la demande
+    req = load_sql_to_dataframe(
+        "SELECT warehouse_id, researcher_id FROM contact_requests WHERE request_id = ? AND owner_id = ?",
+        (request_id, owner_id),
+    )
+    if req.empty:
+        return False, "Demande introuvable ou vous n'etes pas le proprietaire."
+    
+    warehouse_id = req.iloc[0]["warehouse_id"]
+    researcher_id = int(req.iloc[0]["researcher_id"])
+    
+    # Verifier si une offre existe deja
+    existing = load_sql_to_dataframe(
+        "SELECT reservation_id FROM reservations WHERE warehouse_id = ? AND researcher_id = ? AND status = 'pending'",
+        (warehouse_id, researcher_id),
+    )
+    if not existing.empty:
+        return False, "Une offre est deja en attente pour cet entrepot."
+    
+    res_id = str(uuid.uuid4())[:8]
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO reservations (reservation_id, warehouse_id, researcher_id, global_score, status, reason)
+            VALUES (?, ?, ?, ?, 'pending', ?)
+            """,
+            (res_id, warehouse_id, researcher_id, float(price), str(start_date)),
+        )
+        conn.commit()
+        conn.close()
+        
+        # Envoyer le message de notification dans le chat
+        msg_text = f"🏢 **OFFRE DE LOCATION**\n\n💰 Prix proposé : **{price} DH**\n📅 Date de début : **{start_date}**\n\n*(Vous pouvez accepter cette offre pour débloquer l'accès IoT)*"
+        send_chat_message(request_id, owner_id, "owner", msg_text)
+        
+        return True, "Offre envoyée avec succès."
+    except Exception as e:
+        return False, f"Erreur lors de la création de l'offre : {e}"
+
+
+def check_warehouse_access(warehouse_id: str, user_id: int, role: str) -> bool:
+    """Verifie si un utilisateur a le droit d'acceder aux donnees IoT d'un entrepot."""
+    if role == "owner":
+        # Le proprietaire a toujours accès à ses propres entrepôts
+        check = load_sql_to_dataframe(
+            "SELECT 1 FROM warehouses WHERE warehouse_id = ? AND owner_id = ?",
+            (warehouse_id, user_id),
+        )
+        return not check.empty
+    elif role == "researcher":
+        # Le chercheur a accès si il a une reservation CONFIRMED
+        check = load_sql_to_dataframe(
+            "SELECT 1 FROM reservations WHERE warehouse_id = ? AND researcher_id = ? AND status = 'confirmed'",
+            (warehouse_id, user_id),
+        )
+        return not check.empty
+    return False

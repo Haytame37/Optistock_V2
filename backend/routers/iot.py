@@ -24,13 +24,17 @@ def get_readings(
     index: int = -1,
     current_user: dict = Depends(get_current_user),
 ):
+    from core.messaging import check_warehouse_access
+    if not check_warehouse_access(warehouse_id, int(current_user["user_id"]), current_user["role"]):
+        raise HTTPException(status_code=403, detail="Accès refusé. Vous devez avoir une réservation confirmée pour voir ces données.")
+
     query = f"""
         SELECT recorded_at, temp_sensor_1, temp_sensor_2, temp_sensor_3,
                hum_sensor_1, hum_sensor_2, hum_sensor_3
-        FROM iot_readings WHERE warehouse_id = '{warehouse_id}'
+        FROM iot_readings WHERE warehouse_id = ?
         ORDER BY recorded_at
     """
-    df = load_sql_to_dataframe(query)
+    df = load_sql_to_dataframe(query, (warehouse_id,))
     if df.empty:
         raise HTTPException(status_code=404, detail="Aucune donnée IoT pour cet entrepôt")
 

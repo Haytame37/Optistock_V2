@@ -86,14 +86,39 @@ def send_chat(request_id: str, msg: str, current_user: dict = Depends(get_curren
     return {"ok": ok, "feedback": fb}
 
 
+@router.post("/offer/{request_id}")
+def send_offer(
+    request_id: str, 
+    price: float, 
+    start_date: str, 
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user["role"] != "owner":
+        raise HTTPException(status_code=403, detail="Réservé aux propriétaires")
+    
+    from core.messaging import create_rental_offer
+    ok, fb = create_rental_offer(request_id, int(current_user["user_id"]), price, start_date)
+    return {"ok": ok, "feedback": fb}
+
+
 @router.post("/reservation/{request_id}/accept")
 def accept_offer(request_id: str, current_user: dict = Depends(get_current_user)):
+    # Ici request_id peut être soit le reservation_id soit on cherche via le contact_request
+    # Pour simplifier, on va chercher une reservation 'pending' liee au researcher
+    uid = int(current_user["user_id"])
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    
+    # On essaye de trouver une reservation pending pour ce chercheur et cet entrepot (via request_id si c'est le res_id)
     cursor.execute(
-        "UPDATE reservations SET status = 'confirmed' WHERE reservation_id = ?",
-        (request_id,),
+        "UPDATE reservations SET status = 'confirmed' WHERE (reservation_id = ? OR warehouse_id = ?) AND researcher_id = ? AND status = 'pending'",
+        (request_id, request_id, uid),
     )
     conn.commit()
+    count = cursor.rowcount
     conn.close()
+    
+    if count == 0:
+        raise HTTPException(status_code=404, detail="Aucune offre en attente trouvée.")
+        
     return {"message": "Offre acceptée, accès IoT débloqué"}

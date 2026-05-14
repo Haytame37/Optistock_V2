@@ -11,6 +11,11 @@ export async function getOwnerWarehouses() {
   return data
 }
 
+export async function getRecentOwnerWarehouses() {
+  const { data } = await api.get("/warehouses/owner/recent")
+  return data
+}
+
 export async function createWarehouse(wh: WarehouseCreate) {
   const { data } = await api.post("/warehouses", wh)
   return data
