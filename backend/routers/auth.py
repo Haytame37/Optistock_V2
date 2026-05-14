@@ -4,12 +4,16 @@ import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from fastapi import APIRouter, Depends, HTTPException, status
+import secrets, string
+from datetime import timedelta
 
-from schemas.auth import LoginRequest, SignupRequest, TokenResponse, RefreshRequest
+from schemas.auth import LoginRequest, SignupRequest, TokenResponse, RefreshRequest, ForgotPasswordRequest, VerifyOTPRequest, ResetPasswordRequest
 from dependencies.auth import create_access_token, create_refresh_token, decode_token, get_current_user
-from utils.db import load_sql_to_dataframe
+from utils.db import load_sql_to_dataframe, execute_query
+from utils.helpers import get_current_time
 
-from core.auth import authenticate_user, create_user
+from core.auth import authenticate_user, create_user, hash_password
+from core.email_service import send_otp_email
 
 router = APIRouter(prefix="/auth", tags=["Authentification"])
 
@@ -70,6 +74,49 @@ def refresh(req: RefreshRequest):
             "email": user["email"],
         },
     )
+
+@router.post("/forgot-password")
+def forgot_password(req: ForgotPasswordRequest):
+    df = load_sql_to_dataframe("SELECT user_id, first_name FROM users WHERE email = ? AND is_active = 1", (req.email,))
+    if df.empty:
+        return {"message": "Si le compte existe, un code a été envoyé."}
+    
+    user = df.iloc[0]
+    otp_code = "".join(secrets.choice(string.digits) for _ in range(6))
+    expiry_time = (get_current_time() + timedelta(minutes=10)).strftime('%Y-%m-%d %H:%M:%S')
+    
+    execute_query("UPDATE users SET otp_code = ?, otp_expiry = ? WHERE email = ?", (otp_code, expiry_time, req.email))
+    
+    send_otp_email(req.email, user["first_name"], otp_code)
+    return {"message": "Si le compte existe, un code a été envoyé."}
+
+@router.post("/verify-otp")
+def verify_otp(req: VerifyOTPRequest):
+    now = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
+    df = load_sql_to_dataframe(
+        "SELECT user_id FROM users WHERE email = ? AND otp_code = ? AND otp_expiry > ?",
+        (req.email, req.otp_code, now)
+    )
+    if df.empty:
+        raise HTTPException(status_code=400, detail="Code invalide ou expiré")
+    return {"message": "Code valide"}
+
+@router.post("/reset-password")
+def reset_password(req: ResetPasswordRequest):
+    now = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
+    df = load_sql_to_dataframe(
+        "SELECT user_id FROM users WHERE email = ? AND otp_code = ? AND otp_expiry > ?",
+        (req.email, req.otp_code, now)
+    )
+    if df.empty:
+        raise HTTPException(status_code=400, detail="Code invalide ou expiré")
+    
+    new_hash = hash_password(req.new_password)
+    execute_query(
+        "UPDATE users SET password_hash = ?, otp_code = NULL, otp_expiry = NULL WHERE email = ?",
+        (new_hash, req.email)
+    )
+    return {"message": "Mot de passe mis à jour avec succès"}
 
 
 @router.get("/me")

@@ -35,6 +35,18 @@ class UserPayload(BaseModel):
 class RefreshRequest(BaseModel):
     refresh_token: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class VerifyOTPRequest(BaseModel):
+    email: str
+    otp_code: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp_code: str
+    new_password: str
+
 
 class ChangePasswordRequest(BaseModel):
     old_password: str
