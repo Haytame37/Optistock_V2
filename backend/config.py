@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "database", "optistock.db"))
 

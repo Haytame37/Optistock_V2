@@ -87,7 +87,10 @@ def forgot_password(req: ForgotPasswordRequest):
     
     execute_query("UPDATE users SET otp_code = ?, otp_expiry = ? WHERE email = ?", (otp_code, expiry_time, req.email))
     
-    send_otp_email(req.email, user["first_name"], otp_code)
+    success = send_otp_email(req.email, user["first_name"], otp_code)
+    if not success:
+        raise HTTPException(status_code=500, detail="Le serveur SMTP a rejeté l'envoi. Vérifiez la configuration .env.")
+        
     return {"message": "Si le compte existe, un code a été envoyé."}
 
 @router.post("/verify-otp")
