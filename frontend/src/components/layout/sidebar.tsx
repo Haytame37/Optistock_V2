@@ -19,15 +19,17 @@ import {
   Moon,
   ExternalLink,
   RefreshCcw,
+  Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const researcherLinks = [
-  { href: "/researcher", label: "Accueil", icon: Home },
+  { href: "/researcher", label: "Accueil", icon: Home, exact: true },
   { href: "/researcher/search", label: "Recherche", icon: Search },
   { href: "/researcher/results", label: "Résultats", icon: ClipboardList },
   { href: "/researcher/messages", label: "Messagerie", icon: MessageSquare },
   { href: "/researcher/my-warehouses", label: "Mes Entrepôts", icon: Warehouse },
+  { href: "/researcher/optimization-lab", label: "Optimization Lab", icon: Zap },
 ]
 
 const ownerLinks = [
@@ -91,7 +93,7 @@ export function Sidebar({
       <nav className="flex flex-col gap-1 p-3">
         {links.map((link) => {
           const Icon = link.icon
-          const isActive = pathname === link.href
+          const isActive = link.exact ? pathname === link.href : pathname.startsWith(link.href)
           return (
             <Link
               key={link.href}
