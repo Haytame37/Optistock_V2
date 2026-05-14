@@ -103,22 +103,43 @@ def send_offer(
 
 @router.post("/reservation/{request_id}/accept")
 def accept_offer(request_id: str, current_user: dict = Depends(get_current_user)):
-    # Ici request_id peut être soit le reservation_id soit on cherche via le contact_request
-    # Pour simplifier, on va chercher une reservation 'pending' liee au researcher
     uid = int(current_user["user_id"])
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # On essaye de trouver une reservation pending pour ce chercheur et cet entrepot (via request_id si c'est le res_id)
+    # 1. Mettre à jour le statut de la réservation
     cursor.execute(
         "UPDATE reservations SET status = 'confirmed' WHERE (reservation_id = ? OR warehouse_id = ?) AND researcher_id = ? AND status = 'pending'",
         (request_id, request_id, uid),
     )
-    conn.commit()
     count = cursor.rowcount
+    
+    if count > 0:
+        # 2. Récupérer les détails de l'entrepôt pour l'ajouter à 'my_warehouse'
+        cursor.execute(
+            """
+            SELECT w.warehouse_id, w.name, w.address, w.latitude, w.longitude 
+            FROM warehouses w
+            JOIN reservations r ON w.warehouse_id = r.warehouse_id
+            WHERE r.reservation_id = ? OR r.warehouse_id = ?
+            LIMIT 1
+            """,
+            (request_id, request_id)
+        )
+        wh = cursor.fetchone()
+        
+        if wh:
+            # 3. Insérer dans 'my_warehouse' s'il n'y est pas déjà
+            cursor.execute(
+                "INSERT OR REPLACE INTO my_warehouse (id_entrepot, researcher_id, nom, adresse, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)",
+                (wh["warehouse_id"], uid, wh["name"], wh["address"], wh["latitude"], wh["longitude"])
+            )
+    
+    conn.commit()
     conn.close()
     
     if count == 0:
         raise HTTPException(status_code=404, detail="Aucune offre en attente trouvée.")
         
-    return {"message": "Offre acceptée, accès IoT débloqué"}
+    return {"message": "Offre acceptée, entrepôt ajouté à vos actifs et accès IoT débloqué"}

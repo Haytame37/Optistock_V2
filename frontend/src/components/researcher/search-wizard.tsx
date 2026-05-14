@@ -11,7 +11,7 @@ import { searchWarehouses } from "@/services/researcher.service"
 import { toast } from "sonner"
 import type { ProductListItem, SearchResultItem, MyWarehouse as WH, ClientPoint } from "@/types/researcher"
 import api from "@/services/api"
-import { Loader2, Plus, Trash2 } from "lucide-react"
+import { Loader2, Plus, Trash2, Search, TrendingUp, RefreshCcw, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { contactOwner } from "@/services/messaging.service"
 import { 
@@ -167,33 +167,21 @@ export function SearchWizard() {
               <label className="text-sm font-medium">Durée de stockage (jours)</label>
               <Input type="number" min={1} max={365} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
             </div>
-            <div className="space-y-2">
-               <label className="text-sm font-medium">Priorité : Coût vs Proximité</label>
-               <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs text-muted-foreground">Économie</span>
-                  <Input 
-                    type="range" 
-                    min="0" max="1" step="0.1" 
-                    value={costWeight} 
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setCostWeight(val);
-                      setDistWeight(Number((1 - val).toFixed(1)));
-                    }} 
-                    className="h-4 accent-primary"
-                  />
-                  <span className="text-xs text-muted-foreground">Rapidité</span>
-               </div>
-               <p className="text-[10px] text-center text-muted-foreground italic">
-                 {costWeight * 100}% Coût | {distWeight * 100}% Distance
-               </p>
+            <div className="flex items-end">
+              <Button 
+                variant="secondary" 
+                onClick={() => { setQuickMode(true); handleSearch() }} 
+                disabled={searching}
+                className="w-full h-10 gap-2 border-dashed border-2 hover:border-primary transition-all"
+              >
+                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                Recherche Rapide (Sans import)
+              </Button>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button onClick={() => setStep(2)} className="flex-1">Suivant — Entrepôts</Button>
-            <Button variant="secondary" onClick={() => { setQuickMode(true); handleSearch() }} disabled={searching}>
-              {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Recherche rapide
+          <div className="flex gap-3 mt-4">
+            <Button onClick={() => setStep(2)} className="flex-1 h-12 text-lg font-bold">
+              Suivant : Ajouter mes données →
             </Button>
           </div>
         </GlassCard>
@@ -201,24 +189,48 @@ export function SearchWizard() {
 
       {/* Step 2: Warehouses */}
       {step === 2 && (
-        <GlassCard className="p-6 space-y-4">
-          <h3 className="font-semibold text-lg">Ajouter un entrepôt</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <Input placeholder="Nom" value={whForm.nom} onChange={(e) => setWhForm({ ...whForm, nom: e.target.value })} />
-            <Input placeholder="Adresse" value={whForm.adresse} onChange={(e) => setWhForm({ ...whForm, adresse: e.target.value })} />
-            <Input type="number" placeholder="Latitude" value={whForm.latitude} onChange={(e) => setWhForm({ ...whForm, latitude: Number(e.target.value) })} />
-            <Input type="number" placeholder="Longitude" value={whForm.longitude} onChange={(e) => setWhForm({ ...whForm, longitude: Number(e.target.value) })} />
-            <Input type="number" placeholder="Volume m³" value={whForm.volume_m3} onChange={(e) => setWhForm({ ...whForm, volume_m3: Number(e.target.value) })} />
+        <GlassCard className="p-6 space-y-6">
+          <div className="space-y-1">
+            <h3 className="font-bold text-xl flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" /> Vos propres entrepôts
+            </h3>
+            <p className="text-sm text-muted-foreground">Ajoutez ici les entrepôts que vous possédez déjà ou que vous gérez pour les inclure dans l'analyse comparative.</p>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold ml-1">Nom de l'entrepôt</label>
+              <Input placeholder="Ex: Entrepôt Casablanca Port" value={whForm.nom} onChange={(e) => setWhForm({ ...whForm, nom: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold ml-1">Adresse complète</label>
+              <Input placeholder="Ex: 12 Rue de l'Océan, Casablanca" value={whForm.adresse} onChange={(e) => setWhForm({ ...whForm, adresse: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold ml-1">Latitude</label>
+                <Input type="number" placeholder="Ex: 33.573" value={whForm.latitude} onChange={(e) => setWhForm({ ...whForm, latitude: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold ml-1">Longitude</label>
+                <Input type="number" placeholder="Ex: -7.589" value={whForm.longitude} onChange={(e) => setWhForm({ ...whForm, longitude: Number(e.target.value) })} />
+              </div>
+            </div>
+          </div>
+          
           <Button
+            className="w-full md:w-auto px-8"
             onClick={() => {
               if (whForm.nom && whForm.adresse) {
                 setWarehouses([...warehouses, { id_entrepot: Math.random().toString(36).slice(2, 8).toUpperCase(), ...whForm }])
                 setWhForm({ nom: "", adresse: "", latitude: 33.57, longitude: -7.59, volume_m3: 5000 })
+                toast.success("Entrepôt ajouté à la liste d'analyse")
+              } else {
+                toast.error("Veuillez remplir au moins le nom et l'adresse")
               }
             }}
           >
-            <Plus className="h-4 w-4 mr-2" /> Ajouter
+            <Plus className="h-4 w-4 mr-2" /> Ajouter à ma sélection
           </Button>
 
           {warehouses.length > 0 && (
@@ -248,18 +260,38 @@ export function SearchWizard() {
 
       {/* Step 3: Clients */}
       {step === 3 && (
-        <GlassCard className="p-6 space-y-4">
-          <h3 className="font-semibold text-lg">Ajouter un client / point de livraison</h3>
-          <div className="grid grid-cols-3 gap-3">
-            <Input placeholder="Nom" value={clientForm.name} onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })} />
-            <Input type="number" placeholder="Latitude" value={clientForm.latitude} onChange={(e) => setClientForm({ ...clientForm, latitude: Number(e.target.value) })} />
-            <Input type="number" placeholder="Longitude" value={clientForm.longitude} onChange={(e) => setClientForm({ ...clientForm, longitude: Number(e.target.value) })} />
+        <GlassCard className="p-6 space-y-6">
+          <div className="space-y-1">
+            <h3 className="font-bold text-xl flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" /> Vos clients / Points de livraison
+            </h3>
+            <p className="text-sm text-muted-foreground">Définissez les zones géographiques où vous devez livrer vos produits pour calculer l'entrepôt le plus central.</p>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold ml-1">Nom du point</label>
+              <Input placeholder="Ex: Client Tanger" value={clientForm.name} onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold ml-1">Latitude</label>
+              <Input type="number" placeholder="Ex: 35.759" value={clientForm.latitude} onChange={(e) => setClientForm({ ...clientForm, latitude: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold ml-1">Longitude</label>
+              <Input type="number" placeholder="Ex: -5.833" value={clientForm.longitude} onChange={(e) => setClientForm({ ...clientForm, longitude: Number(e.target.value) })} />
+            </div>
+          </div>
+          
           <Button
+            className="w-full md:w-auto px-8"
             onClick={() => {
               if (clientForm.name) {
                 setClients([...clients, { ...clientForm }])
                 setClientForm({ name: "", latitude: 33.5731, longitude: -7.5898 })
+                toast.success("Point de livraison ajouté")
+              } else {
+                toast.error("Veuillez donner un nom au point de livraison")
               }
             }}
           >
@@ -284,10 +316,14 @@ export function SearchWizard() {
           )}
 
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setStep(2)} className="flex-1">← Entrepôts</Button>
-            <Button onClick={() => { setQuickMode(false); handleSearch() }} className="flex-1" disabled={searching}>
-              {searching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Analyser →
+            <Button variant="outline" onClick={() => setStep(2)} className="h-12 flex-1">← Entrepôts</Button>
+            <Button 
+              onClick={() => { setQuickMode(false); handleSearch() }} 
+              className="flex-[2] h-12 text-lg font-bold shadow-lg shadow-primary/20" 
+              disabled={searching}
+            >
+              {searching ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <TrendingUp className="h-5 w-5 mr-2" />}
+              Lancer l'Analyse Logistique →
             </Button>
           </div>
         </GlassCard>
@@ -379,10 +415,22 @@ export function SearchWizard() {
                 warehouses={warehouses.map((w) => ({ name: w.nom, lat: w.latitude, lng: w.longitude, type: "warehouse" as const }))}
                 clients={clients.map((c) => ({ name: c.name, lat: c.latitude, lng: c.longitude, type: "client" as const }))}
               />
+
+              <div className="pt-6 flex justify-center">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  onClick={() => setStep(1)}
+                  className="gap-2 border-primary/20 hover:bg-primary/5"
+                >
+                  <RefreshCcw className="h-4 w-4" /> Relancer une nouvelle recherche
+                </Button>
+              </div>
             </>
           ) : (
-            <GlassCard className="p-8 text-center text-muted-foreground">
-              Aucun résultat. Lancez une nouvelle recherche.
+            <GlassCard className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
+              <p>Aucun résultat. Essayez d'ajuster vos critères ou de changer de produit.</p>
+              <Button onClick={() => setStep(1)} variant="default">Modifier les paramètres</Button>
             </GlassCard>
           )}
         </div>

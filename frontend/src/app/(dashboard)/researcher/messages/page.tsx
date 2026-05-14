@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { 
   getMessagingRequests, 
   getChatMessages, 
@@ -31,6 +32,7 @@ import { useAuth } from "@/providers/auth-provider"
 import { cn } from "@/lib/utils"
 
 export default function ResearcherMessagesPage() {
+  const router = useRouter()
   const { user } = useAuth()
   const [requests, setRequests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -101,7 +103,13 @@ export default function ResearcherMessagesPage() {
     setAccepting(true)
     try {
       const res = await acceptRentalOffer(warehouseId)
-      toast.success(res.message || "Offre acceptée !")
+      toast.success(res.message || "Offre acceptée ! Redirection vers le dashboard IoT...")
+      
+      // Petit délai pour laisser l'utilisateur lire le message de succès
+      setTimeout(() => {
+        router.push(`/iot/${warehouseId}`)
+      }, 1500)
+      
       loadRequests()
       if (selectedReqId) loadChat(selectedReqId)
     } catch (error) {
