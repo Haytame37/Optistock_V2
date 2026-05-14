@@ -12,7 +12,7 @@ import { getMyWarehouses } from "@/services/warehouse.service"
 import { getSearchHistory } from "@/services/researcher.service"
 import { getMessagingRequests } from "@/services/messaging.service"
 import { motion } from "framer-motion"
-import { Search, Warehouse, MessageSquare, ClipboardList } from "lucide-react"
+import { Search, Warehouse, MessageSquare, ClipboardList, Zap } from "lucide-react"
 
 export default function ResearcherPage() {
   const router = useRouter()
@@ -93,6 +93,17 @@ export default function ResearcherPage() {
             <p className="text-sm text-muted-foreground flex-grow">Suivre les statuts de vos demandes de réservation.</p>
             <Button className="mt-4 w-full" variant="outline" onClick={(e) => { e.stopPropagation(); router.push("/researcher/messages"); }}>
               Voir les réponses
+            </Button>
+          </GlassCard>
+        </motion.div>
+
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <GlassCard className="p-6 cursor-pointer h-full flex flex-col border-purple-500/30 hover:border-purple-500/60 transition-all" onClick={() => router.push("/researcher/optimization-lab")}>
+            <Zap className="h-8 w-8 text-purple-500 mb-3" />
+            <h3 className="font-semibold mb-1 text-lg text-purple-600">Optimization Lab</h3>
+            <p className="text-sm text-muted-foreground flex-grow">Expansion de réseau (MIP) et optimisation des tournées de livraison (VRP / OR-Tools).</p>
+            <Button className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white" onClick={(e) => { e.stopPropagation(); router.push("/researcher/optimization-lab"); }}>
+              Lancer le Lab
             </Button>
           </GlassCard>
         </motion.div>

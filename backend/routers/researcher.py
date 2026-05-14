@@ -176,3 +176,86 @@ def get_chat(request_id: str, _current_user: dict = Depends(get_current_user)):
 def send_chat(request_id: str, msg: str, current_user: dict = Depends(get_current_user)):
     ok, fb = send_chat_message(request_id, int(current_user["user_id"]), current_user["role"], msg)
     return ChatSendResponse(ok=ok, feedback=fb)
+
+
+# ── Optimization Lab ──────────────────────────────────────────────────────────
+from pydantic import BaseModel as PydanticBase
+from typing import Optional
+
+class LabSite(PydanticBase):
+    name: str
+    lat: float
+    lon: float
+    capacity: int = 300
+
+class LabClient(PydanticBase):
+    name: str
+    lat: float
+    lon: float
+    demand: int = 80
+
+class LabRequest(PydanticBase):
+    existing: List[LabSite]
+    candidates: List[LabSite]
+    clients: List[LabClient]
+    n_to_add: int = 1
+
+class LabResponse(PydanticBase):
+    routing_mode: str
+    site_result: dict
+    vrp_result: dict
+    cost_matrix: List[List[float]]
+    depot: dict
+
+@router.post("/optimization-lab", response_model=LabResponse)
+def run_optimization_lab(req: LabRequest, _current_user: dict = Depends(get_current_user)):
+    from core.routing import OptiRouteOptimizer, _haversine
+    from core.optimizer_mip import MipExpansionOptimizer
+    from core.optimizer_ortools import ORToolsLogisticOptimizer
+
+    existing  = [{"name": s.name, "lat": s.lat, "lon": s.lon, "capacity": s.capacity} for s in req.existing]
+    candidates = [{"name": s.name, "lat": s.lat, "lon": s.lon, "capacity": s.capacity} for s in req.candidates]
+    clients   = [{"name": c.name, "lat": c.lat, "lon": c.lon, "demand": c.demand} for c in req.clients]
+
+    # 1. Build cost matrix (Haversine × 1.3 tortuosity → minutes at 80km/h)
+    all_sites = existing + candidates
+    sources = [(s["lat"], s["lon"]) for s in all_sites]
+    targets = [(c["lat"], c["lon"]) for c in clients]
+    n_s, n_t = len(sources), len(targets)
+    cost_matrix = np.zeros((n_s, n_t))
+    for i, (la1, lo1) in enumerate(sources):
+        for j, (la2, lo2) in enumerate(targets):
+            dist = _haversine(la1, lo1, la2, lo2) * 1.3
+            cost_matrix[i, j] = round((dist / 80) * 60, 2)  # minutes
+
+    # 2. MIP – best candidate selection
+    mip = MipExpansionOptimizer()
+    site_result = mip.optimize_expansion(existing, candidates, clients, cost_matrix, n_to_add=req.n_to_add)
+
+    # 3. VRP – delivery order from selected depot
+    sel_idx = site_result.get("selected_candidate_indices", [])
+    depot = candidates[sel_idx[0]] if sel_idx else (existing[0] if existing else clients[0])
+
+    all_nodes = [depot] + clients
+    node_coords = [(n["lat"], n["lon"]) for n in all_nodes]
+    n_nodes = len(node_coords)
+    vrp_matrix = np.zeros((n_nodes, n_nodes))
+    for i, (la1, lo1) in enumerate(node_coords):
+        for j, (la2, lo2) in enumerate(node_coords):
+            vrp_matrix[i, j] = _haversine(la1, lo1, la2, lo2)
+
+    vrp = ORToolsLogisticOptimizer()
+    vrp_result = vrp.compute_delivery_order(
+        (depot["lat"], depot["lon"]),
+        [(c["lat"], c["lon"]) for c in clients],
+        vrp_matrix,
+        node_names=[c["name"] for c in clients],
+    )
+
+    return LabResponse(
+        routing_mode="haversine",
+        site_result=site_result,
+        vrp_result=vrp_result,
+        cost_matrix=cost_matrix.tolist(),
+        depot=depot,
+    )
