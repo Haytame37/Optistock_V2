@@ -20,3 +20,9 @@ ENV/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Node.js
+node_modules/
+.next/
+dist/
+build/
