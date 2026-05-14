@@ -11,7 +11,21 @@ import { searchWarehouses } from "@/services/researcher.service"
 import { toast } from "sonner"
 import type { ProductListItem, SearchResultItem, MyWarehouse as WH, ClientPoint } from "@/types/researcher"
 import api from "@/services/api"
-import { Loader2, Plus, Trash2, Upload } from "lucide-react"
+import { Loader2, Plus, Trash2 } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { contactOwner } from "@/services/messaging.service"
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/components/ui/alert-dialog"
+import { Textarea } from "@/components/ui/textarea"
 
 const steps = ["Produit", "Entrepôts", "Clients", "Résultats"]
 
@@ -30,6 +44,11 @@ export function SearchWizard() {
 
   const [whForm, setWhForm] = useState({ nom: "", adresse: "", latitude: 33.57, longitude: -7.59, volume_m3: 5000 })
   const [clientForm, setClientForm] = useState({ name: "", latitude: 33.5731, longitude: -7.5898 })
+  
+  // Contact state
+  const [contactingWh, setContactingWh] = useState<SearchResultItem | null>(null)
+  const [contactMessage, setContactMessage] = useState("")
+  const [sendingContact, setSendingContact] = useState(false)
 
   useEffect(() => {
     api.get("/products").then(({ data }) => {
@@ -60,6 +79,26 @@ export function SearchWizard() {
       toast.error("Erreur lors de l'analyse")
     } finally {
       setSearching(false)
+    }
+  }
+
+  const handleContact = async () => {
+    if (!contactingWh || !contactMessage.trim()) return
+    setSendingContact(true)
+    try {
+      await contactOwner(
+        contactingWh.id,
+        contactingWh.owner_id || 0,
+        product,
+        contactMessage
+      )
+      toast.success("Demande envoyée au propriétaire !")
+      setContactingWh(null)
+      setContactMessage("")
+    } catch (error) {
+      toast.error("Erreur lors de l'envoi du message")
+    } finally {
+      setSendingContact(false)
     }
   }
 
@@ -223,20 +262,67 @@ export function SearchWizard() {
                       <th className="pb-3 font-medium">Distance</th>
                       <th className="pb-3 font-medium">Température</th>
                       <th className="pb-3 font-medium">Humidité</th>
+                      <th className="pb-3 font-medium text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {results.map((r, i) => (
-                      <tr key={i} className="border-b last:border-0">
+                      <tr key={i} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                         <td className="py-3 font-medium">{r.nom}</td>
                         <td className="py-3">
-                          <Badge variant={r.score_logistique >= 70 ? "success" : r.score_logistique >= 40 ? "warning" : "danger"}>
-                            {r.score_logistique.toFixed(2)}
+                          <Badge className={cn(
+                            "font-bold",
+                            r.score_logistique >= 70 ? "bg-green-100 text-green-700 hover:bg-green-100" : 
+                            r.score_logistique >= 40 ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-100" : 
+                            "bg-red-100 text-red-700 hover:bg-red-100"
+                          )}>
+                            {r.score_logistique.toFixed(1)}%
                           </Badge>
                         </td>
-                        <td className="py-3">{r.distance_km?.toFixed(2) ?? "—"} km</td>
+                        <td className="py-3">{r.distance_km?.toFixed(1) ?? "—"} km</td>
                         <td className="py-3">{r.avg_temp}°C</td>
                         <td className="py-3">{r.avg_hum}%</td>
+                        <td className="py-3 text-right">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="outline" size="sm" onClick={() => {
+                                setContactingWh(r)
+                                setContactMessage(`Bonjour, je suis intéressé par votre entrepôt "${r.nom}" pour stocker mon produit "${product}".`)
+                              }}>
+                                Contacter
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Contacter le propriétaire</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Envoyez un premier message pour entamer la discussion sur la location de l'entrepôt <strong>{r.nom}</strong>.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <div className="py-4 space-y-4">
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Votre message</label>
+                                  <Textarea 
+                                    rows={4} 
+                                    value={contactMessage} 
+                                    onChange={e => setContactMessage(e.target.value)}
+                                    placeholder="Ex: Bonjour, j'aimerais en savoir plus sur les tarifs..."
+                                  />
+                                </div>
+                              </div>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel onClick={() => setContactingWh(null)}>Annuler</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={handleContact}
+                                  disabled={sendingContact || !contactMessage.trim()}
+                                >
+                                  {sendingContact ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                  Envoyer la demande
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
