@@ -7,9 +7,23 @@ import { Skeleton } from "@/components/ui/skeleton"
 // Dynamically import react-leaflet to avoid SSR issues
 const MapContainer = dynamic(() => import("react-leaflet").then((m) => m.MapContainer), { ssr: false, loading: () => <Skeleton className="h-[400px] w-full rounded-2xl" /> })
 const TileLayer = dynamic(() => import("react-leaflet").then((m) => m.TileLayer), { ssr: false })
+const LayersControl = dynamic(() => import("react-leaflet").then((m) => m.LayersControl), { ssr: false })
+const BaseLayer = dynamic(() => import("react-leaflet").then((m) => m.LayersControl).then(l => l.BaseLayer), { ssr: false })
 const Marker = dynamic(() => import("react-leaflet").then((m) => m.Marker), { ssr: false })
 const Popup = dynamic(() => import("react-leaflet").then((m) => m.Popup), { ssr: false })
 const Polyline = dynamic(() => import("react-leaflet").then((m) => m.Polyline), { ssr: false })
+
+// This internal component will fix the map layout
+const MapFixer = () => {
+  const { useMap } = require("react-leaflet")
+  const map = useMap()
+  useEffect(() => {
+    setTimeout(() => {
+      map.invalidateSize()
+    }, 200)
+  }, [map])
+  return null
+}
 
 interface MapPoint {
   name: string
@@ -99,10 +113,21 @@ export function LogisticMap({ results, warehouses, clients, lines }: LogisticMap
       </div>
       <div className="h-[400px] w-full rounded-2xl overflow-hidden border">
         <MapContainer center={[center.lat, center.lng]} zoom={6} className="h-full w-full" scrollWheelZoom={true}>
-          <TileLayer
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          />
+          <MapFixer />
+          <LayersControl position="topright">
+            <BaseLayer checked name="Plan (Clair)">
+              <TileLayer
+                attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              />
+            </BaseLayer>
+            <BaseLayer name="Vue Satellite">
+              <TileLayer
+                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              />
+            </BaseLayer>
+          </LayersControl>
           {clients.map((p, i) => p.lat && p.lng && clientIcon && (
             <Marker key={`c-${i}`} position={[p.lat, p.lng]} icon={clientIcon}>
               <Popup><b>{p.name}</b><br />Client</Popup>

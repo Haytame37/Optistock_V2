@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Providers } from "@/providers/providers"
 import "./globals.css"
+import "leaflet/dist/leaflet.css"
 
 export const metadata: Metadata = {
   title: "OptiStock Solutions",

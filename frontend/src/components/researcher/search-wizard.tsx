@@ -11,7 +11,7 @@ import { searchWarehouses } from "@/services/researcher.service"
 import { toast } from "sonner"
 import type { ProductListItem, SearchResultItem, MyWarehouse as WH, ClientPoint } from "@/types/researcher"
 import api from "@/services/api"
-import { Loader2, Plus, Trash2, Search, TrendingUp, RefreshCcw, MapPin } from "lucide-react"
+import { Loader2, Plus, Trash2, Search, TrendingUp, RefreshCcw, MapPin, MessageSquare, Thermometer, Droplets, Store } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { contactOwner } from "@/services/messaging.service"
 import { 
@@ -334,81 +334,105 @@ export function SearchWizard() {
         <div className="space-y-4">
           {results.length > 0 ? (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-3 font-medium">Nom</th>
-                      <th className="pb-3 font-medium">Score</th>
-                      <th className="pb-3 font-medium">Distance</th>
-                      <th className="pb-3 font-medium">Température</th>
-                      <th className="pb-3 font-medium">Humidité</th>
-                      <th className="pb-3 font-medium text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((r, i) => (
-                      <tr key={i} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                        <td className="py-3 font-medium">{r.nom}</td>
-                        <td className="py-3">
-                          <Badge className={cn(
-                            "font-bold",
-                            r.score_logistique >= 70 ? "bg-green-100 text-green-700 hover:bg-green-100" : 
-                            r.score_logistique >= 40 ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-100" : 
-                            "bg-red-100 text-red-700 hover:bg-red-100"
-                          )}>
-                            {r.score_logistique.toFixed(1)}%
-                          </Badge>
-                        </td>
-                        <td className="py-3">{r.distance_km?.toFixed(1) ?? "—"} km</td>
-                        <td className="py-3">{r.avg_temp}°C</td>
-                        <td className="py-3">{r.avg_hum}%</td>
-                        <td className="py-3 text-right">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" onClick={() => {
-                                setContactingWh(r)
-                                setContactMessage(`Bonjour, je suis intéressé par votre entrepôt "${r.nom}" pour stocker mon produit "${product}".`)
-                              }}>
-                                Contacter
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Contacter le propriétaire</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Envoyez un premier message pour entamer la discussion sur la location de l'entrepôt <strong>{r.nom}</strong>.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <div className="py-4 space-y-4">
-                                <div className="space-y-2">
-                                  <label className="text-sm font-medium">Votre message</label>
-                                  <Textarea 
-                                    rows={4} 
-                                    value={contactMessage} 
-                                    onChange={e => setContactMessage(e.target.value)}
-                                    placeholder="Ex: Bonjour, j'aimerais en savoir plus sur les tarifs..."
-                                  />
-                                </div>
-                              </div>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setContactingWh(null)}>Annuler</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={handleContact}
-                                  disabled={sendingContact || !contactMessage.trim()}
-                                >
-                                  {sendingContact ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                                  Envoyer la demande
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {results.map((r, i) => (
+              <GlassCard key={i} className="group p-6 hover:border-primary/50 transition-all flex flex-col relative overflow-hidden bg-background/40">
+                {/* Ranking Badge */}
+                <div className={cn(
+                  "absolute top-0 left-0 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-br-2xl shadow-sm z-10",
+                  i === 0 ? "bg-yellow-500 text-white" : "bg-primary/20 text-primary"
+                )}>
+                  {i === 0 ? "🥇 Recommandation n°1" : `${i + 1}ème choix`}
+                </div>
+
+                <div className="mt-4 flex justify-between items-start mb-6">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Store className="h-6 w-6" />
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground block mb-0.5">Score Logistique</span>
+                    <Badge className={cn(
+                      "font-bold text-sm px-3",
+                      r.score_logistique >= 70 ? "bg-green-500 text-white" : 
+                      r.score_logistique >= 40 ? "bg-yellow-500 text-white" : 
+                      "bg-red-500 text-white"
+                    )}>
+                      {r.score_logistique.toFixed(0)}%
+                    </Badge>
+                  </div>
+                </div>
+
+                <h4 className="font-bold text-xl mb-1 group-hover:text-primary transition-colors line-clamp-1">{r.nom}</h4>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-6">
+                  <MapPin className="h-3.5 w-3.5 text-primary/60" />
+                  <span className="line-clamp-1">{r.adresse}</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 mb-8">
+                  <div className="p-2.5 rounded-xl bg-muted/30 border border-muted-foreground/5 text-center">
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground/60 block mb-1">Distance</span>
+                    <span className="text-sm font-bold">{r.distance_km?.toFixed(1) ?? "—"} km</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-muted/30 border border-muted-foreground/5 text-center">
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground/60 block mb-1">Temp.</span>
+                    <span className="text-sm font-bold">{r.avg_temp}°C</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-muted/30 border border-muted-foreground/5 text-center">
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground/60 block mb-1">Hum.</span>
+                    <span className="text-sm font-bold">{r.avg_hum}%</span>
+                  </div>
+                </div>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      className="w-full mt-auto rounded-full gap-2 shadow-lg shadow-primary/10 group/btn"
+                      onClick={() => {
+                        setContactingWh(r)
+                        setContactMessage(`Bonjour, je suis intéressé par votre entrepôt "${r.nom}" pour stocker mon produit "${product}".`)
+                      }}
+                    >
+                      <MessageSquare className="h-4 w-4" /> 
+                      Contacter le propriétaire
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                        <MessageSquare className="h-5 w-5 text-primary" /> Contacter le propriétaire
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Envoyez un premier message pour entamer la discussion sur la location de l'entrepôt <strong>{r.nom}</strong>.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4 space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold ml-1">Votre message</label>
+                        <Textarea 
+                          rows={4} 
+                          className="rounded-2xl"
+                          value={contactMessage} 
+                          onChange={e => setContactMessage(e.target.value)}
+                          placeholder="Ex: Bonjour, j'aimerais en savoir plus sur les tarifs..."
+                        />
+                      </div>
+                    </div>
+                    <AlertDialogFooter className="gap-2">
+                      <AlertDialogCancel className="rounded-full" onClick={() => setContactingWh(null)}>Annuler</AlertDialogCancel>
+                      <AlertDialogAction 
+                        className="rounded-full px-8"
+                        onClick={handleContact}
+                        disabled={sendingContact || !contactMessage.trim()}
+                      >
+                        {sendingContact ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                        Envoyer la demande
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </GlassCard>
+            ))}
+          </div>
 
               <LogisticMap
                 results={results.map((r) => ({ name: r.nom, lat: r.latitude, lng: r.longitude, type: "result" as const }))}
