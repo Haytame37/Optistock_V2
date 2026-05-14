@@ -42,6 +42,7 @@ interface LogisticMapProps {
   warehouses: MapPoint[]
   clients: MapPoint[]
   lines?: MapLine[]
+  weberPoint?: { lat: number; lng: number }
 }
 
 const iconColors = {
@@ -62,8 +63,11 @@ function createIcon(color: string) {
   })
 }
 
-export function LogisticMap({ results, warehouses, clients, lines }: LogisticMapProps) {
-  const allPoints = useMemo(() => [...results, ...warehouses, ...clients], [results, warehouses, clients])
+export function LogisticMap({ results, warehouses, clients, lines, weberPoint }: LogisticMapProps) {
+  const allPoints = useMemo(() => [
+    ...results, ...warehouses, ...clients,
+    ...(weberPoint ? [{ name: "Weber", lat: weberPoint.lat, lng: weberPoint.lng, type: "result" as const }] : [])
+  ], [results, warehouses, clients, weberPoint])
   const center = useMemo(() => {
     if (allPoints.length === 0) return { lat: 31.7917, lng: -7.0926 }
     const lat = allPoints.reduce((s, p) => s + p.lat, 0) / allPoints.length
@@ -104,12 +108,25 @@ export function LogisticMap({ results, warehouses, clients, lines }: LogisticMap
     })
   }, [])
 
+  const weberIcon = useMemo(() => {
+    if (typeof window === "undefined") return null
+    const L = require("leaflet")
+    return L.divIcon({
+      className: "",
+      html: `<div style="width:38px;height:38px;border-radius:50%;background:#f59e0b;border:4px solid white;box-shadow:0 4px 16px rgba(245,158,11,0.6);display:flex;align-items:center;justify-content:center;font-size:18px;">⭐</div>`,
+      iconSize: [38, 38],
+      iconAnchor: [19, 19],
+      popupAnchor: [0, -19],
+    })
+  }, [])
+
   return (
     <div className="space-y-2">
-      <div className="flex gap-4 text-xs">
+      <div className="flex gap-4 text-xs flex-wrap">
         <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-green-500" /> Résultats</div>
         <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-red-500" /> Mes Entrepôts</div>
         <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-blue-500" /> Clients</div>
+        {weberPoint && <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-400" /> Centre de Gravité (Weber)</div>}
       </div>
       <div className="h-[400px] w-full rounded-2xl overflow-hidden border">
         <MapContainer center={[center.lat, center.lng]} zoom={6} className="h-full w-full" scrollWheelZoom={true}>
@@ -146,6 +163,15 @@ export function LogisticMap({ results, warehouses, clients, lines }: LogisticMap
           {lines?.map((line, i) => (
             <Polyline key={i} positions={[[line.from.lat, line.from.lng], [line.to.lat, line.to.lng]]} color="gray" weight={1.5} opacity={0.6} dashArray="5" />
           ))}
+          {weberPoint && weberIcon && (
+            <Marker position={[weberPoint.lat, weberPoint.lng]} icon={weberIcon}>
+              <Popup>
+                <b>⭐ Centre de Gravité (Weber)</b><br />
+                Lat: {weberPoint.lat.toFixed(4)}° / Lon: {weberPoint.lng.toFixed(4)}°<br />
+                <span style={{color:"#f59e0b",fontWeight:"bold"}}>Point d'implantation optimal</span>
+              </Popup>
+            </Marker>
+          )}
         </MapContainer>
       </div>
     </div>

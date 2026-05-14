@@ -1,17 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { GlassCard } from "@/components/shared/glass-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { LogisticMap } from "@/components/map/logistic-map"
-import { searchWarehouses } from "@/services/researcher.service"
+import { searchWarehouses, calculateWeber } from "@/services/researcher.service"
 import { toast } from "sonner"
-import type { ProductListItem, SearchResultItem, MyWarehouse as WH, ClientPoint } from "@/types/researcher"
+import type { ProductListItem, SearchResultItem, MyWarehouse as WH, ClientPoint, WeberResponse } from "@/types/researcher"
 import api from "@/services/api"
-import { Loader2, Plus, Trash2, Search, TrendingUp, RefreshCcw, MapPin, MessageSquare, Thermometer, Droplets, Store } from "lucide-react"
+import { Loader2, Plus, Trash2, Search, TrendingUp, RefreshCcw, MapPin, MessageSquare, Thermometer, Upload, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { contactOwner } from "@/services/messaging.service"
 import { 
@@ -43,6 +43,11 @@ export function SearchWizard() {
   const [quickMode, setQuickMode] = useState(false)
   const [costWeight, setCostWeight] = useState(0.5)
   const [distWeight, setDistWeight] = useState(0.5)
+  const [weberResult, setWeberResult] = useState<WeberResponse | null>(null)
+  const [calculatingWeber, setCalculatingWeber] = useState(false)
+
+  const whCsvRef = useRef<HTMLInputElement>(null)
+  const clientCsvRef = useRef<HTMLInputElement>(null)
 
   const [whForm, setWhForm] = useState({ nom: "", adresse: "", latitude: 33.57, longitude: -7.59, volume_m3: 5000 })
   const [clientForm, setClientForm] = useState({ name: "", latitude: 33.5731, longitude: -7.5898 })
@@ -51,6 +56,86 @@ export function SearchWizard() {
   const [contactingWh, setContactingWh] = useState<SearchResultItem | null>(null)
   const [contactMessage, setContactMessage] = useState("")
   const [sendingContact, setSendingContact] = useState(false)
+
+  // CSV parsers
+  const handleWarehouseCsv = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      const lines = text.trim().split("\n")
+      const headers = lines[0].split(",").map(h => h.trim().toLowerCase())
+      const nomIdx = headers.findIndex(h => ["nom","name","entrepot"].includes(h))
+      const adrIdx = headers.findIndex(h => ["adresse","address"].includes(h))
+      const latIdx = headers.findIndex(h => h.includes("lat"))
+      const lonIdx = headers.findIndex(h => h.includes("lon"))
+      if (nomIdx < 0 || latIdx < 0 || lonIdx < 0) {
+        toast.error("CSV invalide. Colonnes requises : nom, latitude, longitude")
+        return
+      }
+      const imported: WH[] = []
+      lines.slice(1).forEach(line => {
+        const cols = line.split(",").map(c => c.trim())
+        if (!cols[nomIdx]) return
+        imported.push({
+          id_entrepot: Math.random().toString(36).slice(2, 8).toUpperCase(),
+          nom: cols[nomIdx],
+          adresse: adrIdx >= 0 ? cols[adrIdx] : "",
+          latitude: parseFloat(cols[latIdx]),
+          longitude: parseFloat(cols[lonIdx]),
+          volume_m3: 5000,
+        })
+      })
+      setWarehouses(prev => [...prev, ...imported])
+      toast.success(`${imported.length} entrepôt(s) importé(s) depuis CSV`)
+    }
+    reader.readAsText(file)
+  }
+
+  const handleClientCsv = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      const lines = text.trim().split("\n")
+      const headers = lines[0].split(",").map(h => h.trim().toLowerCase())
+      const nameIdx = headers.findIndex(h => ["nom","name","client","point"].includes(h))
+      const latIdx = headers.findIndex(h => h.includes("lat"))
+      const lonIdx = headers.findIndex(h => h.includes("lon"))
+      if (nameIdx < 0 || latIdx < 0 || lonIdx < 0) {
+        toast.error("CSV invalide. Colonnes requises : nom/name, latitude, longitude")
+        return
+      }
+      const imported: ClientPoint[] = []
+      lines.slice(1).forEach(line => {
+        const cols = line.split(",").map(c => c.trim())
+        if (!cols[nameIdx]) return
+        imported.push({
+          name: cols[nameIdx],
+          latitude: parseFloat(cols[latIdx]),
+          longitude: parseFloat(cols[lonIdx]),
+        })
+      })
+      setClients(prev => [...prev, ...imported])
+      toast.success(`${imported.length} client(s) importé(s) depuis CSV`)
+    }
+    reader.readAsText(file)
+  }
+
+  const handleCalculateWeber = async () => {
+    if (clients.length < 2) {
+      toast.warning("Ajoutez au moins 2 clients pour calculer le Centre de Gravité")
+      return
+    }
+    setCalculatingWeber(true)
+    try {
+      const result = await calculateWeber(clients)
+      setWeberResult(result)
+      toast.success("Centre de Gravité calculé avec succès !")
+    } catch {
+      toast.error("Erreur lors du calcul Weber")
+    } finally {
+      setCalculatingWeber(false)
+    }
+  }
 
   useEffect(() => {
     // Load products
@@ -79,6 +164,7 @@ export function SearchWizard() {
 
   const handleSearch = async () => {
     setSearching(true)
+    setWeberResult(null)
     try {
       const res = await searchWarehouses({
         product,
@@ -96,6 +182,13 @@ export function SearchWizard() {
         toast.success(`${res.results.length} entrepôt(s) trouvé(s)`)
       } else {
         toast.warning("Aucun entrepôt conforme trouvé")
+      }
+      // Auto-calculate Weber if clients provided
+      if (!quickMode && clients.length >= 2) {
+        try {
+          const w = await calculateWeber(clients)
+          setWeberResult(w)
+        } catch {}
       }
     } catch {
       toast.error("Erreur lors de l'analyse")
@@ -190,11 +283,19 @@ export function SearchWizard() {
       {/* Step 2: Warehouses */}
       {step === 2 && (
         <GlassCard className="p-6 space-y-6">
-          <div className="space-y-1">
-            <h3 className="font-bold text-xl flex items-center gap-2">
-              <Plus className="h-5 w-5 text-primary" /> Vos propres entrepôts
-            </h3>
-            <p className="text-sm text-muted-foreground">Ajoutez ici les entrepôts que vous possédez déjà ou que vous gérez pour les inclure dans l'analyse comparative.</p>
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <h3 className="font-bold text-xl flex items-center gap-2">
+                <Plus className="h-5 w-5 text-primary" /> Vos propres entrepôts
+              </h3>
+              <p className="text-sm text-muted-foreground">Ajoutez manuellement ou importez un CSV (colonnes : nom, adresse, latitude, longitude).</p>
+            </div>
+            <div>
+              <input ref={whCsvRef} type="file" accept=".csv" className="hidden" onChange={e => { if(e.target.files?.[0]) handleWarehouseCsv(e.target.files[0]); e.target.value="" }} />
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => whCsvRef.current?.click()}>
+                <Upload className="h-4 w-4" /> Importer CSV
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -261,11 +362,19 @@ export function SearchWizard() {
       {/* Step 3: Clients */}
       {step === 3 && (
         <GlassCard className="p-6 space-y-6">
-          <div className="space-y-1">
-            <h3 className="font-bold text-xl flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-primary" /> Vos clients / Points de livraison
-            </h3>
-            <p className="text-sm text-muted-foreground">Définissez les zones géographiques où vous devez livrer vos produits pour calculer l'entrepôt le plus central.</p>
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <h3 className="font-bold text-xl flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" /> Vos clients / Points de livraison
+              </h3>
+              <p className="text-sm text-muted-foreground">Ajoutez manuellement ou importez un CSV (colonnes : nom/name, latitude, longitude).</p>
+            </div>
+            <div>
+              <input ref={clientCsvRef} type="file" accept=".csv" className="hidden" onChange={e => { if(e.target.files?.[0]) handleClientCsv(e.target.files[0]); e.target.value="" }} />
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => clientCsvRef.current?.click()}>
+                <Upload className="h-4 w-4" /> Importer CSV
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -434,10 +543,50 @@ export function SearchWizard() {
             ))}
           </div>
 
+              {/* Weber Centre de Gravité */}
+              <GlassCard className="p-6 border-primary/30">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="font-bold text-lg flex items-center gap-2">
+                      <Star className="h-5 w-5 text-yellow-500" />
+                      Centre de Gravité Logistique (Weber)
+                    </h4>
+                    <p className="text-sm text-muted-foreground">Point géographique optimal pour une nouvelle implantation d'entrepôt.</p>
+                  </div>
+                  {clients.length >= 2 && (
+                    <Button variant="outline" size="sm" onClick={handleCalculateWeber} disabled={calculatingWeber} className="gap-2 shrink-0">
+                      {calculatingWeber ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4 text-yellow-500" />}
+                      {weberResult ? "Recalculer" : "Calculer Weber"}
+                    </Button>
+                  )}
+                </div>
+                {weberResult ? (
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Latitude Optimale</p>
+                      <p className="text-xl font-black text-yellow-600">{weberResult.lat_opt.toFixed(4)}°</p>
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Longitude Optimale</p>
+                      <p className="text-xl font-black text-yellow-600">{weberResult.lon_opt.toFixed(4)}°</p>
+                    </div>
+                    <div className="text-center p-4 rounded-xl bg-primary/5 border border-primary/20">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Distance Moy.</p>
+                      <p className="text-xl font-black text-primary">{weberResult.avg_distance_km.toFixed(1)} km</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    {clients.length < 2 ? "Ajoutez au moins 2 clients pour activer ce calcul." : "Cliquez sur 'Calculer Weber' pour obtenir le point d'implantation optimal."}
+                  </p>
+                )}
+              </GlassCard>
+
               <LogisticMap
                 results={results.map((r) => ({ name: r.nom, lat: r.latitude, lng: r.longitude, type: "result" as const }))}
                 warehouses={warehouses.map((w) => ({ name: w.nom, lat: w.latitude, lng: w.longitude, type: "warehouse" as const }))}
                 clients={clients.map((c) => ({ name: c.name, lat: c.latitude, lng: c.longitude, type: "client" as const }))}
+                weberPoint={weberResult ? { lat: weberResult.lat_opt, lng: weberResult.lon_opt } : undefined}
               />
 
               <div className="pt-6 flex justify-center">
