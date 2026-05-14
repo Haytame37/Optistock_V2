@@ -85,13 +85,21 @@ def forgot_password(req: ForgotPasswordRequest):
     otp_code = "".join(secrets.choice(string.digits) for _ in range(6))
     expiry_time = (get_current_time() + timedelta(minutes=10)).strftime('%Y-%m-%d %H:%M:%S')
     
-    execute_query("UPDATE users SET otp_code = ?, otp_expiry = ? WHERE email = ?", (otp_code, expiry_time, req.email))
-    
-    success = send_otp_email(req.email, user["first_name"], otp_code)
-    if not success:
-        raise HTTPException(status_code=500, detail="Le serveur SMTP a rejeté l'envoi. Vérifiez la configuration .env.")
+    try:
+        execute_query("UPDATE users SET otp_code = ?, otp_expiry = ? WHERE email = ?", (otp_code, expiry_time, req.email))
+        print(f"DEBUG: OTP {otp_code} généré pour {req.email}")
         
-    return {"message": "Si le compte existe, un code a été envoyé."}
+        success = send_otp_email(req.email, user["first_name"], otp_code)
+        if not success:
+            print("DEBUG: L'envoi de l'email a échoué (send_otp_email a retourné False)")
+            raise HTTPException(status_code=500, detail="Le serveur SMTP a refusé l'envoi. Vérifiez que support.optistock@gmail.com accepte les connexions.")
+            
+        print("DEBUG: Email envoyé avec succès !")
+        return {"message": "Si le compte existe, un code a été envoyé."}
+    except Exception as e:
+        print(f"DEBUG ERROR: {str(e)}")
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Erreur interne : {str(e)}")
 
 @router.post("/verify-otp")
 def verify_otp(req: VerifyOTPRequest):
