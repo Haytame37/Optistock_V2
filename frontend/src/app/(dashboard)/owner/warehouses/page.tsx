@@ -193,7 +193,7 @@ export default function WarehousesList() {
                   <div className="flex flex-1 gap-1">
                     <Button variant="default" size="sm" className="flex-1" onClick={() => router.push(`/iot/${wh.id}`)}>
                       <Activity className="h-3 w-3 mr-1" /> IoT
-                    </Activity>
+                    </Button>
                     
                     <div className="relative">
                       <input
