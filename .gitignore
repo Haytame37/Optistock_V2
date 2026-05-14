@@ -1,28 +1,36 @@
-# Environnement virtuel (Trop lourd)
-venv/
-ENV/
-.venv/
+# Environnement virtuel (Python)
+**/venv/
+**/ENV/
+**/.venv/
+**/env/
 
-# Secrets et configuration (Sécurité)
+# Secrets et configuration
 .env
+.env.local
+.env.*.local
 
-# Python (Fichiers temporaires)
+# Python
 **/__pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
-# Base de données locale (Pour éviter les conflits)
+# Base de données locale
 *.db
 *.db-shm
 *.db-wal
 
-# Dossiers d'outils (VS Code, Mac, Windows)
+# Dossiers d'outils
 .vscode/
+.idea/
 .DS_Store
 Thumbs.db
 
-# Node.js
-node_modules/
-.next/
-dist/
-build/
+# Node.js / React
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+**/out/
+.vercel
+.turbo
