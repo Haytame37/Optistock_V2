@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getOwnerWarehouses, deleteWarehouse } from "@/services/warehouse.service"
+import { importIoTData } from "@/services/iot.service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { MapPin, Search, Edit2, Trash2, Activity } from "lucide-react"
+import { MapPin, Search, Edit2, Trash2, Activity, Upload, Loader2 } from "lucide-react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
@@ -28,6 +29,7 @@ export default function WarehousesList() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState("Tous")
+  const [importingId, setImportingId] = useState<string | null>(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -52,6 +54,19 @@ export default function WarehousesList() {
       loadData()
     } catch (error) {
       toast.error("Erreur lors de la suppression")
+    }
+  }
+
+  const handleImport = async (id: string, file: File) => {
+    setImportingId(id)
+    try {
+      await importIoTData(id, file)
+      toast.success("Données IoT importées avec succès !")
+      router.push(`/iot/${id}`)
+    } catch (error) {
+      toast.error("Erreur lors de l'importation. Vérifiez le format du CSV.")
+    } finally {
+      setImportingId(null)
     }
   }
 
@@ -175,9 +190,33 @@ export default function WarehousesList() {
                     </AlertDialogContent>
                   </AlertDialog>
                   
-                  <Button variant="default" size="sm" className="flex-1" onClick={() => router.push(`/iot/${wh.id}`)}>
-                    <Activity className="h-3 w-3 mr-1" /> IoT
-                  </Button>
+                  <div className="flex flex-1 gap-1">
+                    <Button variant="default" size="sm" className="flex-1" onClick={() => router.push(`/iot/${wh.id}`)}>
+                      <Activity className="h-3 w-3 mr-1" /> IoT
+                    </Activity>
+                    
+                    <div className="relative">
+                      <input
+                        type="file"
+                        id={`csv-${wh.id}`}
+                        className="hidden"
+                        accept=".csv"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleImport(wh.id, file)
+                        }}
+                      />
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        title="Importer CSV" 
+                        disabled={importingId === wh.id}
+                        onClick={() => document.getElementById(`csv-${wh.id}`)?.click()}
+                      >
+                        {importingId === wh.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
