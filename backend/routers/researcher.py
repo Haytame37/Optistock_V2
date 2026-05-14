@@ -85,8 +85,8 @@ def search_warehouses(req: SearchRequest, current_user: dict = Depends(get_curre
 
     results_json = json.dumps(suggestions, default=str)
     execute_query(
-        "INSERT INTO search_history (researcher_id, product_name, volume, duration_days, results_json) VALUES (?, ?, ?, ?, ?)",
-        (researcher_id, req.product, req.volume, req.duration_days, results_json),
+        "INSERT INTO search_history (researcher_id, product_name, volume, duration_days, cost_weight, dist_weight, results_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (researcher_id, req.product, req.volume, req.duration_days, req.cost_weight, req.dist_weight, results_json),
     )
 
     items = [SearchResultItem(**s) for s in suggestions]
@@ -112,7 +112,7 @@ def weber_calculation(clients: List[ClientPoint], _current_user: dict = Depends(
 @router.get("/history", response_model=List[SearchHistoryItem])
 def search_history(current_user: dict = Depends(get_current_user)):
     df = load_sql_to_dataframe(
-        "SELECT id, product_name, volume, duration_days, results_json, created_at FROM search_history WHERE researcher_id = ? ORDER BY created_at DESC",
+        "SELECT id, product_name, volume, duration_days, cost_weight, dist_weight, results_json, created_at FROM search_history WHERE researcher_id = ? ORDER BY created_at DESC",
         (int(current_user["user_id"]),),
     )
     return [SearchHistoryItem(**row) for _, row in df.iterrows()]

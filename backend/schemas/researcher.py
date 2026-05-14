@@ -23,6 +23,8 @@ class SearchRequest(BaseModel):
     product: str
     volume: float = 0.0
     duration_days: int = 7
+    cost_weight: float = 0.5
+    dist_weight: float = 0.5
     warehouses: list[MyWarehouse] = []
     clients: list[ClientPoint] = []
     quick_search: bool = False
@@ -62,6 +64,8 @@ class SearchHistoryItem(BaseModel):
     product_name: str
     volume: float
     duration_days: int
+    cost_weight: Optional[float] = None
+    dist_weight: Optional[float] = None
     results_json: str
     created_at: str
 

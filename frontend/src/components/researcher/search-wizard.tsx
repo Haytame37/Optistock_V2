@@ -41,6 +41,8 @@ export function SearchWizard() {
   const [loading, setLoading] = useState(false)
   const [searching, setSearching] = useState(false)
   const [quickMode, setQuickMode] = useState(false)
+  const [costWeight, setCostWeight] = useState(0.5)
+  const [distWeight, setDistWeight] = useState(0.5)
 
   const [whForm, setWhForm] = useState({ nom: "", adresse: "", latitude: 33.57, longitude: -7.59, volume_m3: 5000 })
   const [clientForm, setClientForm] = useState({ name: "", latitude: 33.5731, longitude: -7.5898 })
@@ -51,10 +53,28 @@ export function SearchWizard() {
   const [sendingContact, setSendingContact] = useState(false)
 
   useEffect(() => {
+    // Load products
     api.get("/products").then(({ data }) => {
       setProducts(data)
-      if (data.length > 0) setProduct(data[0].name)
+      // Only set default if not loading from history
+      const saved = localStorage.getItem("last_search")
+      if (!saved && data.length > 0) setProduct(data[0].name)
     }).catch(() => toast.error("Erreur chargement produits"))
+
+    // Check for history reload
+    const saved = localStorage.getItem("last_search")
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        setProduct(parsed.product)
+        setVolume(parsed.volume)
+        setDuration(parsed.duration_days)
+        if (parsed.cost_weight !== undefined) setCostWeight(parsed.cost_weight)
+        if (parsed.dist_weight !== undefined) setDistWeight(parsed.dist_weight)
+        localStorage.removeItem("last_search")
+        toast.info("Recherche chargée depuis l'historique")
+      } catch (e) {}
+    }
   }, [])
 
   const handleSearch = async () => {
@@ -64,6 +84,8 @@ export function SearchWizard() {
         product,
         volume,
         duration_days: duration,
+        cost_weight: costWeight,
+        dist_weight: distWeight,
         warehouses: quickMode ? [] : warehouses,
         clients: quickMode ? [] : clients,
         quick_search: quickMode,
@@ -140,9 +162,32 @@ export function SearchWizard() {
               <Input type="number" min={0} step={0.1} value={volume} onChange={(e) => setVolume(Number(e.target.value))} />
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Durée de stockage (jours)</label>
-            <Input type="number" min={1} max={365} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Durée de stockage (jours)</label>
+              <Input type="number" min={1} max={365} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
+            </div>
+            <div className="space-y-2">
+               <label className="text-sm font-medium">Priorité : Coût vs Proximité</label>
+               <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs text-muted-foreground">Économie</span>
+                  <Input 
+                    type="range" 
+                    min="0" max="1" step="0.1" 
+                    value={costWeight} 
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setCostWeight(val);
+                      setDistWeight(Number((1 - val).toFixed(1)));
+                    }} 
+                    className="h-4 accent-primary"
+                  />
+                  <span className="text-xs text-muted-foreground">Rapidité</span>
+               </div>
+               <p className="text-[10px] text-center text-muted-foreground italic">
+                 {costWeight * 100}% Coût | {distWeight * 100}% Distance
+               </p>
+            </div>
           </div>
           <div className="flex gap-3">
             <Button onClick={() => setStep(2)} className="flex-1">Suivant — Entrepôts</Button>

@@ -52,7 +52,7 @@ export default function ResearcherPage() {
         <KpiCard label="Historique recherches" value={stats.historyCount} icon="📊" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <GlassCard className="p-6 cursor-pointer h-full flex flex-col" onClick={() => router.push("/researcher/search")}>
             <Search className="h-8 w-8 text-primary mb-3" />
@@ -60,6 +60,17 @@ export default function ResearcherPage() {
             <p className="text-sm text-muted-foreground flex-grow">Lancer une analyse logistique complète et trouver l'unité idéale.</p>
             <Button className="mt-4 w-full" variant="default" onClick={(e) => { e.stopPropagation(); router.push("/researcher/search"); }}>
               Ouvrir la recherche
+            </Button>
+          </GlassCard>
+        </motion.div>
+
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <GlassCard className="p-6 cursor-pointer h-full flex flex-col" onClick={() => router.push("/researcher/history")}>
+            <ClipboardList className="h-8 w-8 text-amber-500 mb-3" />
+            <h3 className="font-semibold mb-1 text-lg text-amber-600">Historique</h3>
+            <p className="text-sm text-muted-foreground flex-grow">Consulter vos recherches passées, les critères utilisés et les résultats obtenus.</p>
+            <Button className="mt-4 w-full" variant="outline" onClick={(e) => { e.stopPropagation(); router.push("/researcher/history"); }}>
+              Voir l'historique
             </Button>
           </GlassCard>
         </motion.div>

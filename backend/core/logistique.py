@@ -101,11 +101,13 @@ def compatibilite_type_stockage(type_entrepot, type_requis):
 #  CLASSEMENT LOGISTIQUE POST-FILTRAGE
 # ══════════════════════════════════════════════════════════════════════════════
 
-def classer_entrepots_logistique(entrepots, researcher_id=None):
+def classer_entrepots_logistique(entrepots, researcher_id=None, cost_weight=0.5, dist_weight=0.5):
     """
     Prend une liste d'entrepots (déjà filtrés comme conformes), calcule leur
     distance par rapport au centre de gravité des points de livraison du chercheur,
     leur attribue un score logistique et les trie.
+    
+    Les poids permettent de privilégier soit le coût (tarif) soit la proximité (distance).
     """
     if not entrepots:
         return []
