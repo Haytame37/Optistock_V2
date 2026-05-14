@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import CORS_ORIGINS, DB_PATH
-from routers import auth, products, researcher, warehouses, iot, messaging, chat
+from routers import auth, products, researcher, warehouses, iot, messaging, chat, admin
 
 app = FastAPI(
     title="OptiStock Solutions API",
@@ -30,6 +30,7 @@ app.include_router(warehouses.router)
 app.include_router(iot.router)
 app.include_router(messaging.router)
 app.include_router(chat.router)
+app.include_router(admin.router)
 
 
 @app.get("/health")

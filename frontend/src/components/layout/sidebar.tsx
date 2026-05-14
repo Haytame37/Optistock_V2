@@ -18,6 +18,7 @@ import {
   Sun,
   Moon,
   ExternalLink,
+  RefreshCcw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -35,6 +36,12 @@ const ownerLinks = [
   { href: "/owner/messages", label: "Messagerie", icon: MessageSquare },
 ]
 
+const adminLinks = [
+  { href: "/admin", label: "Dashboard", icon: Home },
+  { href: "/admin", label: "Utilisateurs", icon: Search },
+  { href: "/admin", label: "Maintenance", icon: RefreshCcw },
+]
+
 export function Sidebar({ 
   collapsed, 
   setCollapsed 
@@ -50,7 +57,10 @@ export function Sidebar({
   // Avoid hydration mismatch
   useEffect(() => setMounted(true), [])
 
-  const links = user?.role === "researcher" ? researcherLinks : user?.role === "owner" ? ownerLinks : []
+  const links = 
+    user?.role === "researcher" ? researcherLinks : 
+    user?.role === "owner" ? ownerLinks : 
+    user?.role === "admin" ? adminLinks : []
 
   if (!mounted) return null
 
