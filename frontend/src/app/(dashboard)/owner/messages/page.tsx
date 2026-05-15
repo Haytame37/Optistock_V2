@@ -6,7 +6,8 @@ import {
   respondToRequest, 
   getChatMessages, 
   sendChatMessage, 
-  sendRentalOffer 
+  sendRentalOffer,
+  deleteMessagingRequest 
 } from "@/services/messaging.service"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,7 +29,8 @@ import {
   RefreshCcw,
   PlusCircle,
   TrendingUp,
-  History
+  History,
+  Trash2
 } from "lucide-react"
 import { toast } from "sonner"
 import { useAuth } from "@/providers/auth-provider"
@@ -134,6 +136,18 @@ export default function OwnerMessagesPage() {
       }
     } catch (error) {
       toast.error("Erreur envoi offre")
+    }
+  }
+
+  const handleDeleteRequest = async (reqId: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cet historique ?")) return
+    try {
+      await deleteMessagingRequest(reqId)
+      toast.success("Historique supprimé")
+      setSelectedReqId(null)
+      loadRequests()
+    } catch (error) {
+      toast.error("Erreur lors de la suppression")
     }
   }
 
@@ -274,7 +288,7 @@ export default function OwnerMessagesPage() {
                       key={req.request_id}
                       onClick={() => setSelectedReqId(req.request_id)}
                       className={cn(
-                        "w-full text-left p-3 rounded-xl transition-all flex items-center gap-3",
+                        "w-full text-left p-3 rounded-xl transition-all flex items-center gap-3 group",
                         selectedReqId === req.request_id 
                           ? "bg-primary text-primary-foreground shadow-md" 
                           : "hover:bg-muted/50"
@@ -292,6 +306,17 @@ export default function OwnerMessagesPage() {
                           {req.researcher_first_name}
                         </p>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                          selectedReqId === req.request_id ? "text-white hover:text-red-200" : "text-muted-foreground hover:text-red-500"
+                        )}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteRequest(req.request_id); }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </button>
                   ))}
                 </div>
@@ -313,15 +338,25 @@ export default function OwnerMessagesPage() {
                       <p className="text-[10px] text-muted-foreground">Entrepôt : {selectedRequest?.warehouse_name}</p>
                     </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="rounded-full gap-2 border-primary/20 text-primary hover:bg-primary/5"
-                    onClick={() => setShowOfferForm(!showOfferForm)}
-                  >
-                    <TrendingUp className="h-4 w-4" /> 
-                    {showOfferForm ? "Annuler l'offre" : "Proposer offre"}
-                  </Button>
+                  <div className="flex gap-2 items-center">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="rounded-full gap-2 border-primary/20 text-primary hover:bg-primary/5"
+                      onClick={() => setShowOfferForm(!showOfferForm)}
+                    >
+                      <TrendingUp className="h-4 w-4" /> 
+                      {showOfferForm ? "Annuler l'offre" : "Proposer offre"}
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                      onClick={() => handleDeleteRequest(selectedReqId)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 {showOfferForm && (
@@ -445,6 +480,7 @@ export default function OwnerMessagesPage() {
                       <th className="p-4">Produit</th>
                       <th className="p-4">Statut</th>
                       <th className="p-4">Date</th>
+                      <th className="p-4 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -462,11 +498,21 @@ export default function OwnerMessagesPage() {
                           </Badge>
                         </td>
                         <td className="p-4 text-muted-foreground">{new Date(req.created_at).toLocaleDateString()}</td>
+                        <td className="p-4 text-center">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                            onClick={() => handleDeleteRequest(req.request_id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                     {history.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-muted-foreground italic">Aucun historique disponible</td>
+                        <td colSpan={6} className="p-8 text-center text-muted-foreground italic">Aucun historique disponible</td>
                       </tr>
                     )}
                   </tbody>

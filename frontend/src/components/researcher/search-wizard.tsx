@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { GlassCard } from "@/components/shared/glass-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,25 +12,26 @@ import { searchWarehouses, calculateWeber } from "@/services/researcher.service"
 import { toast } from "sonner"
 import type { ProductListItem, SearchResultItem, MyWarehouse as WH, ClientPoint, WeberResponse } from "@/types/researcher"
 import api from "@/services/api"
-import { Loader2, Plus, Trash2, Search, TrendingUp, RefreshCcw, MapPin, MessageSquare, Thermometer, Upload, Star } from "lucide-react"
+import { Loader2, Plus, Trash2, Search, TrendingUp, RefreshCcw, MapPin, MessageSquare, Thermometer, Upload, Star, Store } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { contactOwner } from "@/services/messaging.service"
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle, 
-  AlertDialogTrigger 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
 } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 
 const steps = ["Produit", "Entrepôts", "Clients", "Résultats"]
 
 export function SearchWizard() {
+  const router = useRouter()
   const [step, setStep] = useState(1)
   const [products, setProducts] = useState<ProductListItem[]>([])
   const [product, setProduct] = useState("")
@@ -50,8 +52,8 @@ export function SearchWizard() {
   const clientCsvRef = useRef<HTMLInputElement>(null)
 
   const [whForm, setWhForm] = useState({ nom: "", adresse: "", latitude: 33.57, longitude: -7.59, volume_m3: 5000 })
-  const [clientForm, setClientForm] = useState({ name: "", latitude: 33.5731, longitude: -7.5898 })
-  
+  const [clientForm, setClientForm] = useState({ name: "", latitude: 33.5731, longitude: -7.5898, demand: 10 })
+
   // Contact state
   const [contactingWh, setContactingWh] = useState<SearchResultItem | null>(null)
   const [contactMessage, setContactMessage] = useState("")
@@ -64,8 +66,8 @@ export function SearchWizard() {
       const text = e.target?.result as string
       const lines = text.trim().split("\n")
       const headers = lines[0].split(",").map(h => h.trim().toLowerCase())
-      const nomIdx = headers.findIndex(h => ["nom","name","entrepot"].includes(h))
-      const adrIdx = headers.findIndex(h => ["adresse","address"].includes(h))
+      const nomIdx = headers.findIndex(h => ["nom", "name", "entrepot"].includes(h))
+      const adrIdx = headers.findIndex(h => ["adresse", "address"].includes(h))
       const latIdx = headers.findIndex(h => h.includes("lat"))
       const lonIdx = headers.findIndex(h => h.includes("lon"))
       if (nomIdx < 0 || latIdx < 0 || lonIdx < 0) {
@@ -97,9 +99,10 @@ export function SearchWizard() {
       const text = e.target?.result as string
       const lines = text.trim().split("\n")
       const headers = lines[0].split(",").map(h => h.trim().toLowerCase())
-      const nameIdx = headers.findIndex(h => ["nom","name","client","point"].includes(h))
+      const nameIdx = headers.findIndex(h => ["nom", "name", "client", "point"].includes(h))
       const latIdx = headers.findIndex(h => h.includes("lat"))
       const lonIdx = headers.findIndex(h => h.includes("lon"))
+      const demandIdx = headers.findIndex(h => ["demande", "demand", "volume", "qty", "quantite"].includes(h))
       if (nameIdx < 0 || latIdx < 0 || lonIdx < 0) {
         toast.error("CSV invalide. Colonnes requises : nom/name, latitude, longitude")
         return
@@ -112,6 +115,7 @@ export function SearchWizard() {
           name: cols[nameIdx],
           latitude: parseFloat(cols[latIdx]),
           longitude: parseFloat(cols[lonIdx]),
+          demand: demandIdx >= 0 ? (parseFloat(cols[demandIdx]) || 10) : 10,
         })
       })
       setClients(prev => [...prev, ...imported])
@@ -158,7 +162,7 @@ export function SearchWizard() {
         if (parsed.dist_weight !== undefined) setDistWeight(parsed.dist_weight)
         localStorage.removeItem("last_search")
         toast.info("Recherche chargée depuis l'historique")
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [])
 
@@ -188,7 +192,7 @@ export function SearchWizard() {
         try {
           const w = await calculateWeber(clients)
           setWeberResult(w)
-        } catch {}
+        } catch { }
       }
     } catch {
       toast.error("Erreur lors de l'analyse")
@@ -207,9 +211,12 @@ export function SearchWizard() {
         product,
         contactMessage
       )
-      toast.success("Demande envoyée au propriétaire !")
+      toast.success("Demande envoyée au propriétaire ! Redirection vers vos messages...")
       setContactingWh(null)
       setContactMessage("")
+      setTimeout(() => {
+        router.push("/researcher/messages")
+      }, 1500)
     } catch (error) {
       toast.error("Erreur lors de l'envoi du message")
     } finally {
@@ -261,9 +268,9 @@ export function SearchWizard() {
               <Input type="number" min={1} max={365} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
             </div>
             <div className="flex items-end">
-              <Button 
-                variant="secondary" 
-                onClick={() => { setQuickMode(true); handleSearch() }} 
+              <Button
+                variant="secondary"
+                onClick={() => { setQuickMode(true); handleSearch() }}
                 disabled={searching}
                 className="w-full h-10 gap-2 border-dashed border-2 hover:border-primary transition-all"
               >
@@ -291,7 +298,7 @@ export function SearchWizard() {
               <p className="text-sm text-muted-foreground">Ajoutez manuellement ou importez un CSV (colonnes : nom, adresse, latitude, longitude).</p>
             </div>
             <div>
-              <input ref={whCsvRef} type="file" accept=".csv" className="hidden" onChange={e => { if(e.target.files?.[0]) handleWarehouseCsv(e.target.files[0]); e.target.value="" }} />
+              <input ref={whCsvRef} type="file" accept=".csv" className="hidden" onChange={e => { if (e.target.files?.[0]) handleWarehouseCsv(e.target.files[0]); e.target.value = "" }} />
               <Button variant="outline" size="sm" className="gap-2" onClick={() => whCsvRef.current?.click()}>
                 <Upload className="h-4 w-4" /> Importer CSV
               </Button>
@@ -318,7 +325,7 @@ export function SearchWizard() {
               </div>
             </div>
           </div>
-          
+
           <Button
             className="w-full md:w-auto px-8"
             onClick={() => {
@@ -365,19 +372,19 @@ export function SearchWizard() {
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <h3 className="font-bold text-xl flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" /> Vos clients / Points de livraison
+                <MapPin className="h-5 w-5 text-primary" /> Points de livraison (Clients)
               </h3>
-              <p className="text-sm text-muted-foreground">Ajoutez manuellement ou importez un CSV (colonnes : nom/name, latitude, longitude).</p>
+              <p className="text-sm text-muted-foreground">Ajoutez manuellement ou importez un CSV (colonnes : nom/name, latitude, longitude,Demande).</p>
             </div>
             <div>
-              <input ref={clientCsvRef} type="file" accept=".csv" className="hidden" onChange={e => { if(e.target.files?.[0]) handleClientCsv(e.target.files[0]); e.target.value="" }} />
+              <input ref={clientCsvRef} type="file" accept=".csv" className="hidden" onChange={e => { if (e.target.files?.[0]) handleClientCsv(e.target.files[0]); e.target.value = "" }} />
               <Button variant="outline" size="sm" className="gap-2" onClick={() => clientCsvRef.current?.click()}>
                 <Upload className="h-4 w-4" /> Importer CSV
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-semibold ml-1">Nom du point</label>
               <Input placeholder="Ex: Client Tanger" value={clientForm.name} onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })} />
@@ -390,17 +397,21 @@ export function SearchWizard() {
               <label className="text-sm font-semibold ml-1">Longitude</label>
               <Input type="number" placeholder="Ex: -5.833" value={clientForm.longitude} onChange={(e) => setClientForm({ ...clientForm, longitude: Number(e.target.value) })} />
             </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold ml-1">Demande (Unités)</label>
+              <Input type="number" placeholder="Ex: 50" value={clientForm.demand} onChange={(e) => setClientForm({ ...clientForm, demand: Number(e.target.value) })} />
+            </div>
           </div>
-          
+
           <Button
             className="w-full md:w-auto px-8"
             onClick={() => {
-              if (clientForm.name) {
+              if (clientForm.name && clientForm.demand > 0) {
                 setClients([...clients, { ...clientForm }])
-                setClientForm({ name: "", latitude: 33.5731, longitude: -7.5898 })
+                setClientForm({ name: "", latitude: 33.5731, longitude: -7.5898, demand: 10 })
                 toast.success("Point de livraison ajouté")
               } else {
-                toast.error("Veuillez donner un nom au point de livraison")
+                toast.error("Veuillez remplir le nom et une demande > 0")
               }
             }}
           >
@@ -414,7 +425,7 @@ export function SearchWizard() {
                 <div key={i} className="flex items-center justify-between rounded-xl border p-3">
                   <div>
                     <p className="font-medium">{c.name}</p>
-                    <p className="text-xs text-muted-foreground">{c.latitude}°N, {c.longitude}°E</p>
+                    <p className="text-xs text-muted-foreground">{c.latitude}°N, {c.longitude}°E | Demande: <span className="font-bold text-primary">{c.demand}</span></p>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => setClients(clients.filter((_, j) => j !== i))}>
                     <Trash2 className="h-4 w-4" />
@@ -426,9 +437,9 @@ export function SearchWizard() {
 
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setStep(2)} className="h-12 flex-1">← Entrepôts</Button>
-            <Button 
-              onClick={() => { setQuickMode(false); handleSearch() }} 
-              className="flex-[2] h-12 text-lg font-bold shadow-lg shadow-primary/20" 
+            <Button
+              onClick={() => { setQuickMode(false); handleSearch() }}
+              className="flex-[2] h-12 text-lg font-bold shadow-lg shadow-primary/20"
               disabled={searching}
             >
               {searching ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <TrendingUp className="h-5 w-5 mr-2" />}
@@ -443,144 +454,94 @@ export function SearchWizard() {
         <div className="space-y-4">
           {results.length > 0 ? (
             <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {results.map((r, i) => (
-              <GlassCard key={i} className="group p-6 hover:border-primary/50 transition-all flex flex-col relative overflow-hidden bg-background/40">
-                {/* Ranking Badge */}
-                <div className={cn(
-                  "absolute top-0 left-0 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-br-2xl shadow-sm z-10",
-                  i === 0 ? "bg-yellow-500 text-white" : "bg-primary/20 text-primary"
-                )}>
-                  {i === 0 ? "🥇 Recommandation n°1" : `${i + 1}ème choix`}
-                </div>
-
-                <div className="mt-4 flex justify-between items-start mb-6">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Store className="h-6 w-6" />
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground block mb-0.5">Score Logistique</span>
-                    <Badge className={cn(
-                      "font-bold text-sm px-3",
-                      r.score_logistique >= 70 ? "bg-green-500 text-white" : 
-                      r.score_logistique >= 40 ? "bg-yellow-500 text-white" : 
-                      "bg-red-500 text-white"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {results.map((r, i) => (
+                  <GlassCard key={i} className="group p-6 hover:border-primary/50 transition-all flex flex-col relative overflow-hidden bg-background/40">
+                    {/* Ranking Badge */}
+                    <div className={cn(
+                      "absolute top-0 left-0 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-br-2xl shadow-sm z-10",
+                      i === 0 ? "bg-yellow-500 text-white" : "bg-primary/20 text-primary"
                     )}>
-                      {r.score_logistique.toFixed(0)}%
-                    </Badge>
-                  </div>
-                </div>
+                      {i === 0 ? "🥇 Recommandation n°1" : `${i + 1}ème choix`}
+                    </div>
 
-                <h4 className="font-bold text-xl mb-1 group-hover:text-primary transition-colors line-clamp-1">{r.nom}</h4>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-6">
-                  <MapPin className="h-3.5 w-3.5 text-primary/60" />
-                  <span className="line-clamp-1">{r.adresse}</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 mb-8">
-                  <div className="p-2.5 rounded-xl bg-muted/30 border border-muted-foreground/5 text-center">
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground/60 block mb-1">Distance</span>
-                    <span className="text-sm font-bold">{r.distance_km?.toFixed(1) ?? "—"} km</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-muted/30 border border-muted-foreground/5 text-center">
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground/60 block mb-1">Temp.</span>
-                    <span className="text-sm font-bold">{r.avg_temp}°C</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-muted/30 border border-muted-foreground/5 text-center">
-                    <span className="text-[9px] uppercase font-bold text-muted-foreground/60 block mb-1">Hum.</span>
-                    <span className="text-sm font-bold">{r.avg_hum}%</span>
-                  </div>
-                </div>
-
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      className="w-full mt-auto rounded-full gap-2 shadow-lg shadow-primary/10 group/btn"
-                      onClick={() => {
-                        setContactingWh(r)
-                        setContactMessage(`Bonjour, je suis intéressé par votre entrepôt "${r.nom}" pour stocker mon produit "${product}".`)
-                      }}
-                    >
-                      <MessageSquare className="h-4 w-4" /> 
-                      Contacter le propriétaire
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="flex items-center gap-2">
-                        <MessageSquare className="h-5 w-5 text-primary" /> Contacter le propriétaire
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Envoyez un premier message pour entamer la discussion sur la location de l'entrepôt <strong>{r.nom}</strong>.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="py-4 space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold ml-1">Votre message</label>
-                        <Textarea 
-                          rows={4} 
-                          className="rounded-2xl"
-                          value={contactMessage} 
-                          onChange={e => setContactMessage(e.target.value)}
-                          placeholder="Ex: Bonjour, j'aimerais en savoir plus sur les tarifs..."
-                        />
+                    <div className="mt-4 flex justify-between items-start mb-6">
+                      <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Store className="h-6 w-6" />
                       </div>
                     </div>
-                    <AlertDialogFooter className="gap-2">
-                      <AlertDialogCancel className="rounded-full" onClick={() => setContactingWh(null)}>Annuler</AlertDialogCancel>
-                      <AlertDialogAction 
-                        className="rounded-full px-8"
-                        onClick={handleContact}
-                        disabled={sendingContact || !contactMessage.trim()}
-                      >
-                        {sendingContact ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                        Envoyer la demande
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </GlassCard>
-            ))}
-          </div>
 
-              {/* Weber Centre de Gravité */}
-              <GlassCard className="p-6 border-primary/30">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h4 className="font-bold text-lg flex items-center gap-2">
-                      <Star className="h-5 w-5 text-yellow-500" />
-                      Centre de Gravité Logistique (Weber)
-                    </h4>
-                    <p className="text-sm text-muted-foreground">Point géographique optimal pour une nouvelle implantation d'entrepôt.</p>
-                  </div>
-                  {clients.length >= 2 && (
-                    <Button variant="outline" size="sm" onClick={handleCalculateWeber} disabled={calculatingWeber} className="gap-2 shrink-0">
-                      {calculatingWeber ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4 text-yellow-500" />}
-                      {weberResult ? "Recalculer" : "Calculer Weber"}
-                    </Button>
-                  )}
-                </div>
-                {weberResult ? (
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                      <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Latitude Optimale</p>
-                      <p className="text-xl font-black text-yellow-600">{weberResult.lat_opt.toFixed(4)}°</p>
+                    <h4 className="font-bold text-xl mb-1 group-hover:text-primary transition-colors line-clamp-1">{r.nom}</h4>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-6">
+                      <MapPin className="h-3.5 w-3.5 text-primary/60" />
+                      <span className="line-clamp-1">{r.adresse}</span>
                     </div>
-                    <div className="text-center p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                      <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Longitude Optimale</p>
-                      <p className="text-xl font-black text-yellow-600">{weberResult.lon_opt.toFixed(4)}°</p>
+
+                    <div className="grid grid-cols-3 gap-3 mb-8">
+                      <div className="p-2.5 rounded-xl bg-muted/30 border border-muted-foreground/5 text-center">
+                        <span className="text-[9px] uppercase font-bold text-muted-foreground/60 block mb-1">Distance</span>
+                        <span className="text-sm font-bold">{r.distance_km?.toFixed(1) ?? "—"} km</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-muted/30 border border-muted-foreground/5 text-center">
+                        <span className="text-[9px] uppercase font-bold text-muted-foreground/60 block mb-1">Temp.</span>
+                        <span className="text-sm font-bold">{r.avg_temp}°C</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-muted/30 border border-muted-foreground/5 text-center">
+                        <span className="text-[9px] uppercase font-bold text-muted-foreground/60 block mb-1">Hum.</span>
+                        <span className="text-sm font-bold">{r.avg_hum}%</span>
+                      </div>
                     </div>
-                    <div className="text-center p-4 rounded-xl bg-primary/5 border border-primary/20">
-                      <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Distance Moy.</p>
-                      <p className="text-xl font-black text-primary">{weberResult.avg_distance_km.toFixed(1)} km</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    {clients.length < 2 ? "Ajoutez au moins 2 clients pour activer ce calcul." : "Cliquez sur 'Calculer Weber' pour obtenir le point d'implantation optimal."}
-                  </p>
-                )}
-              </GlassCard>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          className="w-full mt-auto rounded-full gap-2 shadow-lg shadow-primary/10 group/btn"
+                          onClick={() => {
+                            setContactingWh(r)
+                            setContactMessage(`Bonjour, je suis intéressé par votre entrepôt "${r.nom}" pour stocker mon produit "${product}".`)
+                          }}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          Contacter le propriétaire
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-background/95 backdrop-blur-2xl border-primary/20 z-[100]">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5 text-primary" /> Contacter le propriétaire
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Envoyez un premier message pour entamer la discussion sur la location de l'entrepôt <strong>{r.nom}</strong>.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="py-4 space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold ml-1">Votre message</label>
+                            <Textarea
+                              rows={4}
+                              className="rounded-2xl"
+                              value={contactMessage}
+                              onChange={e => setContactMessage(e.target.value)}
+                              placeholder="Ex: Bonjour, j'aimerais en savoir plus sur les tarifs..."
+                            />
+                          </div>
+                        </div>
+                        <AlertDialogFooter className="gap-2">
+                          <AlertDialogCancel className="rounded-full" onClick={() => setContactingWh(null)}>Annuler</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="rounded-full px-8"
+                            onClick={handleContact}
+                            disabled={sendingContact || !contactMessage.trim()}
+                          >
+                            {sendingContact ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Envoyer la demande
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </GlassCard>
+                ))}
+              </div>
 
               <LogisticMap
                 results={results.map((r) => ({ name: r.nom, lat: r.latitude, lng: r.longitude, type: "result" as const }))}
@@ -590,9 +551,9 @@ export function SearchWizard() {
               />
 
               <div className="pt-6 flex justify-center">
-                <Button 
-                  variant="outline" 
-                  size="lg" 
+                <Button
+                  variant="outline"
+                  size="lg"
                   onClick={() => setStep(1)}
                   className="gap-2 border-primary/20 hover:bg-primary/5"
                 >

@@ -50,7 +50,12 @@ def get_admin_stats(current_user: dict = Depends(get_current_user)):
         system_score=98.5,
         user_distribution=user_dist,
         warehouse_distribution=wh_dist,
-        activity_history=activity_history
+        activity_history=activity_history,
+        all_warehouses=load_sql_to_dataframe("""
+            SELECT w.warehouse_id as id, w.name, w.iot_token, u.first_name || ' ' || u.last_name as owner_name 
+            FROM warehouses w 
+            JOIN users u ON w.owner_id = u.user_id
+        """).to_dict(orient="records")
     )
 
 @router.get("/users", response_model=List[UserSummary])
@@ -159,4 +164,10 @@ def purge_locks(current_user: dict = Depends(get_current_user)):
     check_admin(current_user)
     execute_query("UPDATE warehouses SET status = 'available' WHERE status = 'locked'")
     execute_query("DELETE FROM reservations WHERE status = 'locked'")
+    return {"success": True}
+@router.patch("/warehouses/{warehouse_id}/iot-token")
+def update_iot_token(warehouse_id: str, token_data: dict, current_user: dict = Depends(get_current_user)):
+    check_admin(current_user)
+    token = token_data.get("token")
+    execute_query("UPDATE warehouses SET iot_token = ? WHERE warehouse_id = ?", (token, warehouse_id))
     return {"success": True}

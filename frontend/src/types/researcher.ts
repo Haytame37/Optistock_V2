@@ -2,6 +2,7 @@ export interface ClientPoint {
   name: string
   latitude: number
   longitude: number
+  demand: number
 }
 
 export interface MyWarehouse {

@@ -10,6 +10,7 @@ class AdminStats(BaseModel):
     user_distribution: dict # role -> count
     warehouse_distribution: dict # status -> count
     activity_history: List[dict] # {date, count}
+    all_warehouses: Optional[List[dict]] = []
 
 class UserSummary(BaseModel):
     user_id: int

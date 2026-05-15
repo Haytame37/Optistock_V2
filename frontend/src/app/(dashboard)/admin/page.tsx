@@ -42,7 +42,8 @@ import {
   deleteUser, 
   runCleanup, 
   purgeLocks,
-  getUserProfile 
+  getUserProfile,
+  updateWarehouseToken
 } from "@/services/admin.service"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -116,6 +117,16 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleUpdateToken = async (warehouseId: string, token: string) => {
+    try {
+      await updateWarehouseToken(warehouseId, token);
+      toast.success("Dashboard IoT activé pour cet entrepôt");
+      loadData();
+    } catch {
+      toast.error("Erreur lors de l'activation IoT");
+    }
+  }
+
   if (loading && !stats) return <div className="p-12 text-center">Chargement du panel admin...</div>
 
   return (
@@ -129,9 +140,6 @@ export default function AdminDashboard() {
           <Button variant="outline" size="sm" onClick={loadData}>
             <RefreshCcw className="h-4 w-4 mr-2" /> Actualiser
           </Button>
-          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 py-1 px-3">
-            <ShieldAlert className="h-3 w-3 mr-2" /> Mode Sécurisé
-          </Badge>
         </div>
       </div>
 
@@ -139,6 +147,7 @@ export default function AdminDashboard() {
         <TabsList className="bg-muted/50 p-1">
           <TabsTrigger value="overview">📈 Vue d'ensemble</TabsTrigger>
           <TabsTrigger value="users">👥 Utilisateurs</TabsTrigger>
+          <TabsTrigger value="warehouses">🏢 Entrepôts</TabsTrigger>
           <TabsTrigger value="maintenance">⚙️ Maintenance</TabsTrigger>
         </TabsList>
 
@@ -331,6 +340,67 @@ export default function AdminDashboard() {
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </GlassCard>
+        </TabsContent>
+
+        <TabsContent value="warehouses" className="space-y-6">
+          <GlassCard className="p-6">
+            <h3 className="font-bold mb-6 flex items-center gap-2">
+              <Warehouse className="h-5 w-5 text-primary" />
+              Gestion des Activations IoT
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground font-medium">
+                    <th className="pb-3 pl-2">Entrepôt</th>
+                    <th className="pb-3">Propriétaire</th>
+                    <th className="pb-3">Token IoT (ThingsBoard)</th>
+                    <th className="pb-3">Statut</th>
+                    <th className="pb-3 text-right pr-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats?.all_warehouses?.map((w: any) => (
+                    <tr key={w.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors group">
+                      <td className="py-4 pl-2">
+                        <p className="font-bold">{w.name}</p>
+                        <p className="text-xs text-muted-foreground">{w.id}</p>
+                      </td>
+                      <td className="py-4 text-xs font-medium">
+                        {w.owner_name}
+                      </td>
+                      <td className="py-4 font-mono text-[10px]">
+                        {w.iot_token ? (
+                          <span className="text-green-600 font-bold">{w.iot_token}</span>
+                        ) : (
+                          <span className="text-muted-foreground italic">Non activé</span>
+                        )}
+                      </td>
+                      <td className="py-4">
+                        <Badge variant={w.iot_token ? "default" : "outline"} className={cn(w.iot_token && "bg-green-500 hover:bg-green-600")}>
+                          {w.iot_token ? "Connecté" : "En attente"}
+                        </Badge>
+                      </td>
+                      <td className="py-4 text-right pr-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="gap-2"
+                          onClick={() => {
+                            const token = prompt(`Saisir le Token ThingsBoard pour [${w.name}]`, w.iot_token || "");
+                            if (token !== null) handleUpdateToken(w.id, token);
+                          }}
+                        >
+                          <Settings className="h-3 w-3" />
+                          {w.iot_token ? "Modifier" : "Activer"}
+                        </Button>
                       </td>
                     </tr>
                   ))}

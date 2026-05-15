@@ -52,23 +52,12 @@ export default function ResearcherPage() {
         <KpiCard label="Historique recherches" value={stats.historyCount} icon="📊" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <GlassCard className="p-6 cursor-pointer h-full flex flex-col" onClick={() => router.push("/researcher/search")}>
-            <Search className="h-8 w-8 text-primary mb-3" />
-            <h3 className="font-semibold mb-1 text-lg text-primary">Recherche d'entrepôt</h3>
-            <p className="text-sm text-muted-foreground flex-grow">Lancer une analyse logistique complète et trouver l'unité idéale.</p>
-            <Button className="mt-4 w-full" variant="default" onClick={(e) => { e.stopPropagation(); router.push("/researcher/search"); }}>
-              Ouvrir la recherche
-            </Button>
-          </GlassCard>
-        </motion.div>
-
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <GlassCard className="p-6 cursor-pointer h-full flex flex-col" onClick={() => router.push("/researcher/history")}>
             <ClipboardList className="h-8 w-8 text-amber-500 mb-3" />
             <h3 className="font-semibold mb-1 text-lg text-amber-600">Historique</h3>
-            <p className="text-sm text-muted-foreground flex-grow">Consulter vos recherches passées, les critères utilisés et les résultats obtenus.</p>
+            <p className="text-sm text-muted-foreground flex-grow">Consulter vos recherches passées et résultats.</p>
             <Button className="mt-4 w-full" variant="outline" onClick={(e) => { e.stopPropagation(); router.push("/researcher/history"); }}>
               Voir l'historique
             </Button>
@@ -79,7 +68,7 @@ export default function ResearcherPage() {
           <GlassCard className="p-6 cursor-pointer h-full flex flex-col" onClick={() => router.push("/researcher/my-warehouses")}>
             <Warehouse className="h-8 w-8 text-green-500 mb-3" />
             <h3 className="font-semibold mb-1 text-lg text-green-600">Mes entrepôts</h3>
-            <p className="text-sm text-muted-foreground flex-grow">Consulter la liste de vos entrepôts loués et leur état IoT.</p>
+            <p className="text-sm text-muted-foreground flex-grow">Vos entrepôts loués et leur état IoT.</p>
             <Button className="mt-4 w-full" variant="outline" onClick={(e) => { e.stopPropagation(); router.push("/researcher/my-warehouses"); }}>
               Voir mes entrepôts
             </Button>
@@ -89,21 +78,10 @@ export default function ResearcherPage() {
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <GlassCard className="p-6 cursor-pointer h-full flex flex-col" onClick={() => router.push("/researcher/messages")}>
             <MessageSquare className="h-8 w-8 text-blue-500 mb-3" />
-            <h3 className="font-semibold mb-1 text-lg text-blue-600">Réponses propriétaires</h3>
-            <p className="text-sm text-muted-foreground flex-grow">Suivre les statuts de vos demandes de réservation.</p>
+            <h3 className="font-semibold mb-1 text-lg text-blue-600">Réponses</h3>
+            <p className="text-sm text-muted-foreground flex-grow">Suivre vos demandes de réservation.</p>
             <Button className="mt-4 w-full" variant="outline" onClick={(e) => { e.stopPropagation(); router.push("/researcher/messages"); }}>
               Voir les réponses
-            </Button>
-          </GlassCard>
-        </motion.div>
-
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <GlassCard className="p-6 cursor-pointer h-full flex flex-col border-purple-500/30 hover:border-purple-500/60 transition-all" onClick={() => router.push("/researcher/optimization-lab")}>
-            <Zap className="h-8 w-8 text-purple-500 mb-3" />
-            <h3 className="font-semibold mb-1 text-lg text-purple-600">Optimization Lab</h3>
-            <p className="text-sm text-muted-foreground flex-grow">Expansion de réseau (MIP) et optimisation des tournées de livraison (VRP / OR-Tools).</p>
-            <Button className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white" onClick={(e) => { e.stopPropagation(); router.push("/researcher/optimization-lab"); }}>
-              Lancer le Lab
             </Button>
           </GlassCard>
         </motion.div>

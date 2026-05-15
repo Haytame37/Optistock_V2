@@ -1,31 +1,46 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useEffect, useState, useRef } from "react"
+import { GlassCard } from "@/components/shared/glass-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { GlassCard } from "@/components/shared/glass-card"
-import { LogisticMap } from "@/components/map/logistic-map"
-import api from "@/services/api"
 import { toast } from "sonner"
-import { Plus, Trash2, Loader2, Zap, MapPin, Package, Building2, Upload, ChevronRight } from "lucide-react"
+import { 
+  Zap, 
+  MapPin, 
+  Building2, 
+  Package, 
+  Plus, 
+  Trash2, 
+  Loader2, 
+  ChevronRight,
+  Upload
+} from "lucide-react"
+import dynamic from "next/dynamic"
+import api from "@/services/api"
 
-// ── Default Béni Mellal region scenario ────────────────────────────────────────
+// Dynamic import for Map to avoid SSR issues
+const LogisticMap = dynamic(() => import("@/components/map/logistic-map").then(m => m.LogisticMap), { 
+  ssr: false,
+  loading: () => <div className="h-[400px] w-full bg-slate-100 animate-pulse rounded-xl flex items-center justify-center">Chargement de la carte...</div>
+})
+
 const DEFAULT_EXISTING = [
-  { name: "Khouribga", lat: 32.881, lon: -6.906, capacity: 500 },
-  { name: "Fquih Ben Salah", lat: 32.5, lon: -6.69, capacity: 400 },
+  { name: "Entrepôt Casablanca", lat: 33.5731, lon: -7.5898, capacity: 500 },
+  { name: "Entrepôt Marrakech", lat: 31.6295, lon: -7.9811, capacity: 400 },
 ]
+
 const DEFAULT_CANDIDATES = [
-  { name: "Béni Mellal", lat: 32.337, lon: -6.35, capacity: 300 },
-  { name: "Khénifra", lat: 32.936, lon: -5.67, capacity: 350 },
-  { name: "Azilal", lat: 31.964, lon: -6.559, capacity: 250 },
+  { name: "Site Candidat Beni Mellal", lat: 32.3373, lon: -6.3498, capacity: 300 },
+  { name: "Site Candidat Khouribga", lat: 32.8810, lon: -6.9063, capacity: 300 },
+  { name: "Site Candidat Fquih Ben Salah", lat: 32.5028, lon: -6.6911, capacity: 300 },
 ]
+
 const DEFAULT_CLIENTS = [
-  { name: "Kasba Tadla", lat: 32.597, lon: -6.268, demand: 120 },
-  { name: "Oued Zem", lat: 32.862, lon: -6.561, demand: 90 },
-  { name: "Mrirt", lat: 33.167, lon: -5.568, demand: 60 },
-  { name: "Demnate", lat: 31.731, lon: -7.036, demand: 80 },
-  { name: "Zaouiat Cheikh", lat: 32.651, lon: -5.92, demand: 70 },
+  { name: "Client Azilal", lat: 31.9667, lon: -6.5667, demand: 80 },
+  { name: "Client Demnate", lat: 31.7333, lon: -7.0333, demand: 60 },
+  { name: "Client Kasba Tadla", lat: 32.5972, lon: -6.2694, demand: 120 },
 ]
 
 type Site = { name: string; lat: number; lon: number; capacity: number }
@@ -76,14 +91,25 @@ export default function OptimizationLabPage() {
       const nameIdx = headers.findIndex(h => ["nom","name","client"].includes(h))
       const latIdx  = headers.findIndex(h => h.includes("lat"))
       const lonIdx  = headers.findIndex(h => h.includes("lon"))
-      const demIdx  = headers.findIndex(h => h.includes("dem") || h.includes("demand"))
-      if (nameIdx < 0 || latIdx < 0 || lonIdx < 0) { toast.error("CSV invalide"); return }
+      const demIdx  = headers.findIndex(h => ["demande","demand","volume","qty","quantite"].includes(h))
+      
+      if (nameIdx < 0 || latIdx < 0 || lonIdx < 0) { 
+        toast.error("CSV invalide. Colonnes requises : nom, latitude, longitude")
+        return 
+      }
+      
       const imported: Client[] = lines.slice(1).map(l => {
         const c = l.split(",").map(v => v.trim())
-        return { name: c[nameIdx], lat: parseFloat(c[latIdx]), lon: parseFloat(c[lonIdx]), demand: demIdx >= 0 ? parseInt(c[demIdx]) : 80 }
-      }).filter(c => c.name)
+        return { 
+          name: c[nameIdx], 
+          lat: parseFloat(c[latIdx]), 
+          lon: parseFloat(c[lonIdx]), 
+          demand: demIdx >= 0 ? (parseInt(c[demIdx]) || 10) : 10 
+        }
+      }).filter(c => c.name && !isNaN(c.lat))
+      
       setClients(prev => [...prev, ...imported])
-      toast.success(`${imported.length} clients importés`)
+      toast.success(`${imported.length} clients importés avec succès`)
     }
     reader.readAsText(file)
   }
@@ -131,10 +157,9 @@ export default function OptimizationLabPage() {
         <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-widest">
           <Zap className="h-4 w-4" /> Optimization Lab
         </div>
-        <h1 className="text-3xl font-black tracking-tight">Expansion & Tournées Logistiques</h1>
+        <h1 className="text-3xl font-black tracking-tight">Planification de Réseau & Économies de Transport</h1>
         <p className="text-muted-foreground max-w-2xl">
-          Sélectionnez le meilleur site candidat (MIP / OR-Tools) et calculez l'ordre optimal de livraison (VRP).
-          Scénario par défaut : Région Béni Mellal — Khénifra.
+          Simulez l'implantation de vos futurs entrepôts et optimisez vos trajets de livraison. Cet outil utilise des algorithmes de pointe pour identifier les sites les plus rentables et organiser vos tournées, vous permettant de réduire drastiquement vos coûts de carburant et vos temps de trajet.
         </p>
       </div>
 
@@ -200,10 +225,11 @@ export default function OptimizationLabPage() {
             <div className="space-y-1 max-h-44 overflow-y-auto">
               {clients.map((c, i) => <ClientRow key={i} client={c} onRemove={() => setClients(clients.filter((_, j) => j !== i))} />)}
             </div>
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-5 gap-1">
               <Input placeholder="Nom" className="col-span-2 h-8 text-xs" value={newCl.name} onChange={e => setNewCl({...newCl, name: e.target.value})} />
               <Input type="number" placeholder="Lat" className="h-8 text-xs" value={newCl.lat} onChange={e => setNewCl({...newCl, lat: +e.target.value})} />
               <Input type="number" placeholder="Lon" className="h-8 text-xs" value={newCl.lon} onChange={e => setNewCl({...newCl, lon: +e.target.value})} />
+              <Input type="number" placeholder="Demande" title="Volume de demande" className="h-8 text-xs" value={newCl.demand} onChange={e => setNewCl({...newCl, demand: +e.target.value})} />
             </div>
             <Button size="sm" variant="outline" className="w-full gap-1 h-8" onClick={() => { if (newCl.name) { setClients([...clients, newCl]); setNewCl({name:"",lat:32.5,lon:-6.5,demand:80}) } }}>
               <Plus className="h-3 w-3" /> Ajouter
@@ -273,7 +299,6 @@ export default function OptimizationLabPage() {
                   <Package className="h-4 w-4 text-primary" /> Ordre Optimal de Livraison
                 </h4>
                 <div className="space-y-2">
-                  {/* Depot */}
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                     <div className="h-7 w-7 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-black">🏭</div>
                     <div>
@@ -293,7 +318,6 @@ export default function OptimizationLabPage() {
                       {step < vrpOrder.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
                     </div>
                   ))}
-                  {/* Return to depot */}
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                     <div className="h-7 w-7 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-black">🏭</div>
                     <div>

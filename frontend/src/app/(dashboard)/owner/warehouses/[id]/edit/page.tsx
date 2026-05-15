@@ -9,7 +9,15 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { getWarehouse, updateWarehouse } from "@/services/warehouse.service"
-import { Save, X } from "lucide-react"
+import { Save, X, Settings2 } from "lucide-react"
+import { cn } from "@/lib/utils"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export default function EditWarehousePage() {
   const router = useRouter()
@@ -24,6 +32,7 @@ export default function EditWarehousePage() {
     latitude: "",
     longitude: "",
     volume_m3: "",
+    status: "available",
   })
 
   useEffect(() => {
@@ -36,6 +45,7 @@ export default function EditWarehousePage() {
           latitude: data.latitude.toString(),
           longitude: data.longitude.toString(),
           volume_m3: data.volume_m3.toString(),
+          status: data.status || "available",
         })
       } catch (error) {
         toast.error("Impossible de charger les données de l'entrepôt")
@@ -71,6 +81,7 @@ export default function EditWarehousePage() {
         latitude: parseFloat(formData.latitude),
         longitude: parseFloat(formData.longitude),
         volume_m3: formData.volume_m3 ? parseFloat(formData.volume_m3) : 0,
+        status: formData.status,
       }
 
       await updateWarehouse(id, payload)
@@ -131,6 +142,38 @@ export default function EditWarehousePage() {
           </div>
 
           <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">⚙️ Statut Opérationnel</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label>État de disponibilité</Label>
+                  <Select 
+                    value={formData.status} 
+                    onValueChange={(val) => setFormData(prev => ({ ...prev, status: val }))}
+                  >
+                    <SelectTrigger className={cn(
+                      "w-full font-bold",
+                      formData.status === 'available' ? 'text-green-600' :
+                      formData.status === 'rented' ? 'text-blue-600' :
+                      'text-amber-600'
+                    )}>
+                      <SelectValue placeholder="Choisir un statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="available">Disponible</SelectItem>
+                      <SelectItem value="rented">Occupé / Actif</SelectItem>
+                      <SelectItem value="maintenance">En Maintenance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground mt-2 italic">
+                    Note: Un entrepôt en maintenance n'est pas visible par les chercheurs.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">📦 Capacité & Volume</CardTitle>

@@ -35,11 +35,14 @@ from core.messaging import (
 router = APIRouter(prefix="/researcher", tags=["Chercheur"])
 
 
-def fermat_weber(points: np.ndarray) -> tuple:
+def fermat_weber(points: np.ndarray, weights: np.ndarray) -> tuple:
     def objective(p):
         diffs = points - p
-        return np.sum(np.sqrt((diffs ** 2).sum(axis=1)))
-    x0 = points.mean(axis=0)
+        dists = np.sqrt((diffs ** 2).sum(axis=1))
+        return np.sum(dists * weights)
+    
+    # Initialisation : barycentre pondéré
+    x0 = np.average(points, axis=0, weights=weights)
     result = minimize(objective, x0, method="L-BFGS-B")
     lat_opt, lon_opt = result.x
     R = 6371.0
@@ -57,7 +60,7 @@ def fermat_weber(points: np.ndarray) -> tuple:
 @router.post("/search", response_model=SearchResponse)
 def search_warehouses(req: SearchRequest, current_user: dict = Depends(get_current_user)):
     researcher_id = int(current_user["user_id"])
-    compliant = get_compliant_warehouses(req.product)
+    compliant = get_compliant_warehouses(req.product, researcher_id)
     suggestions = classer_entrepots_logistique(compliant, researcher_id)
     saved_points = 0
     saved_warehouses = 0
@@ -68,8 +71,8 @@ def search_warehouses(req: SearchRequest, current_user: dict = Depends(get_curre
         cursor.execute("DELETE FROM delivery_points WHERE researcher_id = ?", (researcher_id,))
         for c in req.clients:
             cursor.execute(
-                "INSERT INTO delivery_points (request_id, researcher_id, name, latitude, longitude) VALUES (?, ?, ?, ?, ?)",
-                (str(uuid.uuid4())[:8], researcher_id, c.name, c.latitude, c.longitude),
+                "INSERT INTO delivery_points (request_id, researcher_id, name, latitude, longitude, demand) VALUES (?, ?, ?, ?, ?, ?)",
+                (str(uuid.uuid4())[:8], researcher_id, c.name, c.latitude, c.longitude, c.demand),
             )
         saved_points = len(req.clients)
     if req.warehouses:
@@ -105,7 +108,8 @@ def weber_calculation(clients: List[ClientPoint], _current_user: dict = Depends(
     if len(clients) < 2:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Au moins 2 clients requis")
     pts = np.array([[c.latitude, c.longitude] for c in clients])
-    lat_opt, lon_opt, avg_dist = fermat_weber(pts)
+    wts = np.array([c.demand for c in clients])
+    lat_opt, lon_opt, avg_dist = fermat_weber(pts, wts)
     return WeberResponse(lat_opt=lat_opt, lon_opt=lon_opt, avg_distance_km=avg_dist)
 
 

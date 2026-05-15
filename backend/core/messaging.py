@@ -121,9 +121,22 @@ def create_contact_request(
             """,
             (request_id, warehouse_id, owner_id, researcher_id, product_name, message.strip(), REQUEST_PENDING),
         )
+        # 3. Insérer le message initial dans le chat pour qu'il soit visible dès l'ouverture
+        cursor.execute(
+            """
+            INSERT INTO chat_messages (message_id, request_id, sender_id, sender_role, message)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (str(uuid.uuid4())[:8], request_id, researcher_id, "researcher", message.strip()),
+        )
+
+        cursor.execute(
+            "UPDATE warehouses SET status = 'locked' WHERE warehouse_id = ?",
+            (warehouse_id,)
+        )
         conn.commit()
         conn.close()
-        print(f"[OK] Demande {request_id} créée: warehouse={warehouse_id}, owner={owner_id}, researcher={researcher_id}")
+        print(f"[OK] Demande {request_id} créée, message initial inséré et entrepôt {warehouse_id} VERROUILLÉ.")
         return True, request_id
     except Exception as e:
         print(f"[ERREUR] Insertion contact_request: {e}")
@@ -309,3 +322,27 @@ def check_warehouse_access(warehouse_id: str, user_id: int, role: str) -> bool:
         )
         return not check.empty
     return False
+
+
+def delete_contact_request(request_id: str, user_id: int) -> bool:
+    """Supprime une demande et ses messages si l'utilisateur est concerné."""
+    ensure_messaging_schema()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Verifier si l'utilisateur est le chercheur ou le proprio
+    cursor.execute(
+        "SELECT 1 FROM contact_requests WHERE request_id = ? AND (owner_id = ? OR researcher_id = ?)",
+        (request_id, user_id, user_id)
+    )
+    if not cursor.fetchone():
+        conn.close()
+        return False
+        
+    # Supprimer les messages et la demande
+    cursor.execute("DELETE FROM chat_messages WHERE request_id = ?", (request_id,))
+    cursor.execute("DELETE FROM contact_requests WHERE request_id = ?", (request_id,))
+    
+    conn.commit()
+    conn.close()
+    return True

@@ -74,6 +74,25 @@ PRODUCT_CONDITIONS = {
             "temps_resistance_haut_h": 240.0
         }
     },
+    "Produits Pharmaceutiques": {
+        "type_stockage_logistique": "pharma",
+        "temperature": {
+            "min": 15.0,
+            "max": 25.0,
+            "marge_bas": 0.0,
+            "marge_haut": 0.0,
+            "temps_resistance_bas_min_h": 0.5,
+            "temps_resistance_haut_min_h": 0.5
+        },
+        "humidite": {
+            "min": 35.0,
+            "max": 50.0,
+            "marge_bas": 0.0,
+            "marge_haut": 0.0,
+            "temps_resistance_bas_min_h": 1.0,
+            "temps_resistance_haut_min_h": 1.0
+        }
+    },
     "Composants Électroniques": {
         "type_stockage_logistique": "sec",
         "temperature": {

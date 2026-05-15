@@ -2,7 +2,7 @@ import sqlite3
 from utils.db import get_db_connection
 from utils.helpers import get_current_time
 
-def add_warehouse(owner_id, name, address, volume_m3, latitude, longitude):
+def add_warehouse(owner_id, name, address, volume_m3, latitude, longitude, iot_token=None):
     """Ajoute un nouvel entrepôt à la base de données."""
     conn = None
     try:
@@ -17,14 +17,14 @@ def add_warehouse(owner_id, name, address, volume_m3, latitude, longitude):
         
         now_str = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute('''
-            INSERT INTO warehouses (warehouse_id, owner_id, name, address, volume_m3, latitude, longitude, status, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?)
-        ''', (warehouse_id, owner_id, name, address, volume_m3, latitude, longitude, now_str))
+            INSERT INTO warehouses (warehouse_id, owner_id, name, address, volume_m3, latitude, longitude, iot_token, status, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'available', ?)
+        ''', (warehouse_id, owner_id, name, address, volume_m3, latitude, longitude, iot_token, now_str))
         conn.commit()
         return warehouse_id
     except Exception as e:
         print(f"Error adding warehouse: {e}")
-        return None
+        raise Exception(str(e))
     finally:
         if conn:
             conn.close()
@@ -51,7 +51,7 @@ def get_warehouse_by_id(warehouse_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT name, address, volume_m3, latitude, longitude FROM warehouses WHERE warehouse_id = ?", (warehouse_id,))
+        cursor.execute("SELECT name, address, volume_m3, latitude, longitude, iot_token, status FROM warehouses WHERE warehouse_id = ?", (warehouse_id,))
         # sqlite3.Row permet l'accès par nom ou index
         return cursor.fetchone()
     except Exception as e:
@@ -61,18 +61,27 @@ def get_warehouse_by_id(warehouse_id):
         if conn:
             conn.close()
 
-def update_warehouse(warehouse_id, name, address, volume_m3, latitude, longitude):
+def update_warehouse(warehouse_id, name, address, volume_m3, latitude, longitude, status=None, iot_token=None):
     """Met à jour les informations d'un entrepôt."""
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         now_str = get_current_time().strftime('%Y-%m-%d %H:%M:%S')
-        cursor.execute("""
-            UPDATE warehouses 
-            SET name = ?, address = ?, volume_m3 = ?, latitude = ?, longitude = ?, updated_at = ?
-            WHERE warehouse_id = ?
-        """, (name, address, volume_m3, latitude, longitude, now_str, warehouse_id))
+        
+        # Si le statut est fourni, on le met à jour
+        if status:
+            cursor.execute("""
+                UPDATE warehouses 
+                SET name = ?, address = ?, volume_m3 = ?, latitude = ?, longitude = ?, iot_token = ?, status = ?, updated_at = ?
+                WHERE warehouse_id = ?
+            """, (name, address, volume_m3, latitude, longitude, iot_token, status, now_str, warehouse_id))
+        else:
+            cursor.execute("""
+                UPDATE warehouses 
+                SET name = ?, address = ?, volume_m3 = ?, latitude = ?, longitude = ?, iot_token = ?, updated_at = ?
+                WHERE warehouse_id = ?
+            """, (name, address, volume_m3, latitude, longitude, iot_token, now_str, warehouse_id))
         conn.commit()
         return cursor.rowcount > 0
     except Exception as e:
@@ -89,7 +98,7 @@ def get_warehouses_by_owner(owner_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT w.warehouse_id, w.name, w.address, w.volume_m3, w.latitude, w.longitude, w.status,
+            SELECT w.warehouse_id, w.name, w.address, w.volume_m3, w.latitude, w.longitude, w.status, w.iot_token,
                    (SELECT COUNT(*) FROM reservations r WHERE r.warehouse_id = w.warehouse_id AND r.status = 'confirmed') as is_rented
             FROM warehouses w 
             WHERE w.owner_id = ?
@@ -98,11 +107,8 @@ def get_warehouses_by_owner(owner_id):
         
         result = []
         for r in rows:
-            if r['is_rented'] > 0:
-                st_val = "Actif"
-            else:
-                st_val = "Disponible"
-                if r['status'] == "unavailable": st_val = "Non disponible"
+            # On utilise le statut de la DB sans le modifier
+            st_val = r['status'] if r['status'] else "available"
             
             result.append({
                 "id": r['warehouse_id'],
@@ -113,7 +119,8 @@ def get_warehouses_by_owner(owner_id):
                 "lon": r['longitude'],
                 "gps": f"{r['latitude']}° N, {r['longitude']}° E",
                 "status": st_val,
-                "is_rented": r['is_rented'] > 0
+                "is_rented": r['is_rented'] > 0,
+                "iot_token": r['iot_token']
             })
         return result
     except Exception as e:
@@ -141,11 +148,7 @@ def get_recent_warehouses_by_owner(owner_id, limit=3):
         
         result = []
         for r in rows:
-            if r['is_rented'] > 0:
-                st_val = "Actif"
-            else:
-                st_val = "Disponible"
-                if r['status'] == "unavailable": st_val = "Non disponible"
+            st_val = r['status'] if r['status'] else "available"
             
             result.append({
                 "id": r['warehouse_id'],

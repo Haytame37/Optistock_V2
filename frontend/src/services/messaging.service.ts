@@ -34,3 +34,8 @@ export async function acceptRentalOffer(requestIdOrWarehouseId: string) {
   const { data } = await api.post(`/messaging/reservation/${requestIdOrWarehouseId}/accept`)
   return data
 }
+
+export async function deleteMessagingRequest(requestId: string) {
+  const { data } = await api.delete(`/messaging/request/${requestId}`)
+  return data
+}

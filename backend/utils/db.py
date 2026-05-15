@@ -21,12 +21,16 @@ def get_db_connection():
     return conn
 
 def execute_query(query, params=()):
-    """Exécute une requête (INSERT, UPDATE, DELETE) et commit."""
+    """Exécute une requête (INSERT, UPDATE, DELETE), commit et retourne True si réussi."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
         cursor.execute(query, params)
         conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"DB Error: {e}")
+        return False
     finally:
         conn.close()
 

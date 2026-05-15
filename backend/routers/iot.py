@@ -99,8 +99,8 @@ def get_readings(
     kpi = IoTKPI(
         current_temp=round(current_t, 1),
         current_hum=round(current_h, 1),
-        avg_temp=round(float(df["T"].mean()), 1),
-        avg_hum=round(float(df["H"].mean()), 1),
+        avg_temp=round(current_t, 1),
+        avg_hum=round(current_h, 1),
         temp_status=temp_status,
         hum_status=hum_status,
         temp_color=temp_color,

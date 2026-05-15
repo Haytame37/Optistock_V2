@@ -4,30 +4,12 @@ import os
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "optistock.db"))
 
 def create_database():
-    """Crée ou réinitialise la base de données avec le nouveau schéma EARSER."""
+    """Crée la base de données si elle n'existe pas, sans supprimer les données existantes."""
     
-    if os.path.exists(DB_PATH):
-        try:
-            os.remove(DB_PATH)
-            print("Ancienne base de donnees supprimee.")
-        except PermissionError:
-            print("Impossible de supprimer le fichier (verrouille). Nettoyage des tables existantes...")
-
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     # Activer les contraintes de clés étrangères
-    cursor.execute("PRAGMA foreign_keys = OFF;")
-    
-    # Nettoyage
-    cursor.execute("DROP TABLE IF EXISTS iot_readings")
-    cursor.execute("DROP TABLE IF EXISTS reservations")
-    cursor.execute("DROP TABLE IF EXISTS my_warehouse")
-    cursor.execute("DROP TABLE IF EXISTS delivery_points")
-    cursor.execute("DROP TABLE IF EXISTS warehouses")
-    cursor.execute("DROP TABLE IF EXISTS users")
-    cursor.execute("DROP TABLE IF EXISTS search_history")
-    
     cursor.execute("PRAGMA foreign_keys = ON;")
 
     # 1. Table users
@@ -37,11 +19,13 @@ def create_database():
             role TEXT NOT NULL CHECK(role IN ('admin', 'researcher', 'owner')),
             first_name TEXT NOT NULL,
             last_name TEXT NOT NULL,
-            email TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             is_active INTEGER DEFAULT 1 CHECK(is_active IN (0, 1)),
             created_at DATETIME DEFAULT (datetime('now', '+1 hours')),
-            updated_at DATETIME DEFAULT (datetime('now', '+1 hours'))
+            updated_at DATETIME DEFAULT (datetime('now', '+1 hours')),
+            otp_code TEXT,
+            otp_expiry TEXT
         )
     ''')
 
@@ -55,7 +39,9 @@ def create_database():
             volume_m3 REAL,
             latitude REAL,
             longitude REAL,
-            status TEXT DEFAULT 'available' CHECK(status IN ('available', 'unavailable')),
+            iot_token TEXT,
+            storage_type TEXT DEFAULT 'standard',
+            status TEXT DEFAULT 'available' CHECK(status IN ('available', 'unavailable', 'locked', 'rented')),
             updated_at DATETIME DEFAULT (datetime('now', '+1 hours')),
             FOREIGN KEY (owner_id) REFERENCES users(user_id) ON DELETE SET NULL
         )
@@ -73,8 +59,7 @@ def create_database():
         )
     ''')
 
-    # 4. Table my_warehouse (Pour les imports chercheurs)
-    cursor.execute("DROP TABLE IF EXISTS my_warehouse")
+    # 4. Table my_warehouse (Pour les actifs chercheurs)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS my_warehouse (
             id_entrepot TEXT PRIMARY KEY,
@@ -83,6 +68,8 @@ def create_database():
             adresse TEXT,
             latitude REAL,
             longitude REAL,
+            iot_token TEXT,
+            product_name TEXT,
             FOREIGN KEY (researcher_id) REFERENCES users(user_id) ON DELETE CASCADE
         )
     ''')
@@ -112,6 +99,8 @@ def create_database():
             product_name TEXT,
             volume REAL,
             duration_days INTEGER,
+            cost_weight REAL,
+            dist_weight REAL,
             results_json TEXT,
             created_at DATETIME DEFAULT (datetime('now', '+1 hours')),
             FOREIGN KEY (researcher_id) REFERENCES users(user_id) ON DELETE CASCADE
@@ -129,21 +118,32 @@ def create_database():
             temp_sensor_3 REAL,
             hum_sensor_1 REAL,
             hum_sensor_2 REAL,
-            hum_sensor_3 REAL,
-            FOREIGN KEY (warehouse_id) REFERENCES warehouses(warehouse_id) ON DELETE CASCADE
+            hum_sensor_3 REAL
         )
     ''')
 
-    # Création d'index pour optimiser les jointures et recherches temporelles
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_iot_warehouse ON iot_readings(warehouse_id);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_iot_recorded_at ON iot_readings(recorded_at);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_res_warehouse ON reservations(warehouse_id);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_wh_status ON warehouses(status);")
+    # --- LOGIQUE D'AUTO-RÉPARATION (MIGRATIONS AUTOMATIQUES) ---
+    
+    # Vérification des colonnes pour warehouses
+    cursor.execute("PRAGMA table_info(warehouses)")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'iot_token' not in columns:
+        cursor.execute("ALTER TABLE warehouses ADD COLUMN iot_token TEXT")
+    if 'storage_type' not in columns:
+        cursor.execute("ALTER TABLE warehouses ADD COLUMN storage_type TEXT DEFAULT 'standard'")
+    
+    # Vérification des colonnes pour my_warehouse
+    cursor.execute("PRAGMA table_info(my_warehouse)")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'iot_token' not in columns:
+        cursor.execute("ALTER TABLE my_warehouse ADD COLUMN iot_token TEXT")
+    if 'product_name' not in columns:
+        cursor.execute("ALTER TABLE my_warehouse ADD COLUMN product_name TEXT")
 
     conn.commit()
     conn.close()
     
-    print(f"Base de données SQLite (Schéma EARSER) créée avec succès : {DB_PATH}")
+    print(f"Base de données SQLite auto-réparée et prête : {DB_PATH}")
 
 if __name__ == "__main__":
     create_database()

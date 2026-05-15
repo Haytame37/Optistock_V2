@@ -37,3 +37,8 @@ export async function purgeLocks() {
   const { data } = await api.post("/admin/maintenance/purge-locks")
   return data
 }
+
+export async function updateWarehouseToken(warehouseId: string, token: string) {
+  const { data } = await api.patch(`/admin/warehouses/${warehouseId}/iot-token`, { token })
+  return data
+}

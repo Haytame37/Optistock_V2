@@ -25,11 +25,8 @@ import { Button } from "@/components/ui/button"
 
 const researcherLinks = [
   { href: "/researcher", label: "Accueil", icon: Home, exact: true },
-  { href: "/researcher/search", label: "Recherche", icon: Search },
-  { href: "/researcher/results", label: "Résultats", icon: ClipboardList },
-  { href: "/researcher/messages", label: "Messagerie", icon: MessageSquare },
-  { href: "/researcher/my-warehouses", label: "Mes Entrepôts", icon: Warehouse },
-  { href: "/researcher/optimization-lab", label: "Optimization Lab", icon: Zap },
+  { href: "/researcher/search", label: "Module 1 : Recherche d'entrepôt", icon: Search },
+  { href: "/researcher/optimization-lab", label: "Module 2 : Optimization Lab", icon: Zap },
 ]
 
 const ownerLinks = [

@@ -8,6 +8,7 @@ class ClientPoint(BaseModel):
     name: str
     latitude: float
     longitude: float
+    demand: float = 1.0
 
 
 class MyWarehouse(BaseModel):

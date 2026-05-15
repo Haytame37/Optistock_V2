@@ -79,7 +79,7 @@ def refresh(req: RefreshRequest):
 def forgot_password(req: ForgotPasswordRequest):
     df = load_sql_to_dataframe("SELECT user_id, first_name FROM users WHERE email = ? AND is_active = 1", (req.email,))
     if df.empty:
-        return {"message": "Si le compte existe, un code a été envoyé."}
+        raise HTTPException(status_code=404, detail="Aucun compte trouvé avec cette adresse e-mail.")
     
     user = df.iloc[0]
     otp_code = "".join(secrets.choice(string.digits) for _ in range(6))
@@ -95,7 +95,7 @@ def forgot_password(req: ForgotPasswordRequest):
             raise HTTPException(status_code=500, detail="Le serveur SMTP a refusé l'envoi. Vérifiez que support.optistock@gmail.com accepte les connexions.")
             
         print("DEBUG: Email envoyé avec succès !")
-        return {"message": "Si le compte existe, un code a été envoyé."}
+        return {"message": "Code de vérification envoyé avec succès ! Veuillez vérifier votre boîte mail."}
     except Exception as e:
         print(f"DEBUG ERROR: {str(e)}")
         if isinstance(e, HTTPException): raise e

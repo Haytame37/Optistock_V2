@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from typing import List
 
 from schemas.messaging import ContactRequestResponse, ChatMessageResponse, ChatSendResponse
@@ -86,11 +86,14 @@ def send_chat(request_id: str, msg: str, current_user: dict = Depends(get_curren
     return {"ok": ok, "feedback": fb}
 
 
+from utils.email_utils import send_offer_received_email, send_acceptance_confirmation_email
+
 @router.post("/offer/{request_id}")
 def send_offer(
     request_id: str, 
     price: float, 
     start_date: str, 
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     if current_user["role"] != "owner":
@@ -98,48 +101,122 @@ def send_offer(
     
     from core.messaging import create_rental_offer
     ok, fb = create_rental_offer(request_id, int(current_user["user_id"]), price, start_date)
+    
+    if ok:
+        # NOTIFICATION EMAIL AU CHERCHEUR (EN ARRIÈRE-PLAN)
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT u.email, w.name as warehouse_name, 
+                       (SELECT full_name FROM users WHERE user_id = ?) as owner_name
+                FROM contact_requests cr 
+                JOIN users u ON cr.researcher_id = u.user_id 
+                JOIN warehouses w ON cr.warehouse_id = w.warehouse_id 
+                WHERE cr.request_id = ?
+                """,
+                (int(current_user["user_id"]), request_id)
+            )
+            row = cursor.fetchone()
+            if row:
+                background_tasks.add_task(
+                    send_offer_received_email, 
+                    row["email"], 
+                    row["owner_name"] or "Un Propriétaire", 
+                    row["warehouse_name"]
+                )
+            conn.close()
+        except Exception as e:
+            print(f"Erreur préparation email offre : {e}")
+
     return {"ok": ok, "feedback": fb}
 
 
 @router.post("/reservation/{request_id}/accept")
-def accept_offer(request_id: str, current_user: dict = Depends(get_current_user)):
+def accept_offer(
+    request_id: str, 
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
+):
     uid = int(current_user["user_id"])
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # 1. Mettre à jour le statut de la réservation
-    cursor.execute(
-        "UPDATE reservations SET status = 'confirmed' WHERE (reservation_id = ? OR warehouse_id = ?) AND researcher_id = ? AND status = 'pending'",
-        (request_id, request_id, uid),
-    )
-    count = cursor.rowcount
-    
-    if count > 0:
-        # 2. Récupérer les détails de l'entrepôt pour l'ajouter à 'my_warehouse'
+    try:
+        # 1. Trouver la réservation
         cursor.execute(
-            """
-            SELECT w.warehouse_id, w.name, w.address, w.latitude, w.longitude 
-            FROM warehouses w
-            JOIN reservations r ON w.warehouse_id = r.warehouse_id
-            WHERE r.reservation_id = ? OR r.warehouse_id = ?
-            LIMIT 1
-            """,
-            (request_id, request_id)
+            "SELECT warehouse_id, status, (SELECT product_name FROM contact_requests WHERE request_id = reservations.reservation_id OR warehouse_id = reservations.warehouse_id LIMIT 1) as product_name FROM reservations WHERE (reservation_id = ? OR warehouse_id = ?) AND researcher_id = ?",
+            (request_id, request_id, uid)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Aucune offre trouvée pour cet identifiant.")
+        
+        warehouse_id = row["warehouse_id"]
+        product_name = row["product_name"]
+        is_already_confirmed = row["status"] == "confirmed"
+
+        # 2. Confirmer la réservation
+        if not is_already_confirmed:
+            cursor.execute(
+                "UPDATE reservations SET status = 'confirmed' WHERE (reservation_id = ? OR warehouse_id = ?) AND researcher_id = ?",
+                (request_id, request_id, uid)
+            )
+
+        # 3. Récupérer les détails de l'entrepôt
+        cursor.execute(
+            "SELECT name, address, latitude, longitude, iot_token, owner_id FROM warehouses WHERE warehouse_id = ?",
+            (warehouse_id,)
         )
         wh = cursor.fetchone()
         
         if wh:
-            # 3. Insérer dans 'my_warehouse' s'il n'y est pas déjà
+            # 4. Ajouter à my_warehouse
             cursor.execute(
-                "INSERT OR REPLACE INTO my_warehouse (id_entrepot, researcher_id, nom, adresse, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)",
-                (wh["warehouse_id"], uid, wh["name"], wh["address"], wh["latitude"], wh["longitude"])
+                "INSERT OR REPLACE INTO my_warehouse (id_entrepot, researcher_id, nom, adresse, latitude, longitude, iot_token, product_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (warehouse_id, uid, wh["name"], wh["address"], wh["latitude"], wh["longitude"], wh["iot_token"], product_name)
             )
-    
-    conn.commit()
-    conn.close()
-    
-    if count == 0:
-        raise HTTPException(status_code=404, detail="Aucune offre en attente trouvée.")
+            
+            # 5. Marquer l'entrepôt comme LOUÉ
+            cursor.execute(
+                "UPDATE warehouses SET status = 'rented' WHERE warehouse_id = ?",
+                (warehouse_id,)
+            )
+
+            # NOTIFICATION EMAIL AU PROPRIÉTAIRE (EN ARRIÈRE-PLAN)
+            try:
+                cursor.execute("SELECT email FROM users WHERE user_id = ?", (wh["owner_id"],))
+                owner_row = cursor.fetchone()
+                
+                cursor.execute("SELECT full_name FROM users WHERE user_id = ?", (uid,))
+                researcher_row = cursor.fetchone()
+                
+                if owner_row and researcher_row:
+                    background_tasks.add_task(
+                        send_acceptance_confirmation_email,
+                        owner_row["email"], 
+                        researcher_row["full_name"], 
+                        wh["name"]
+                    )
+            except Exception as email_err:
+                print(f"Erreur préparation email acceptation : {email_err}")
         
-    return {"message": "Offre acceptée, entrepôt ajouté à vos actifs et accès IoT débloqué"}
+        conn.commit()
+        return {"message": "Offre acceptée ! L'accès IoT est maintenant débloqué dans 'Mes Entrepôts'."}
+
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Erreur technique : {str(e)}")
+    finally:
+        conn.close()
+from core.messaging import delete_contact_request
+
+@router.delete("/request/{request_id}")
+def delete_request(request_id: str, current_user: dict = Depends(get_current_user)):
+    ok = delete_contact_request(request_id, int(current_user["user_id"]))
+    if not ok:
+        raise HTTPException(status_code=404, detail="Demande introuvable ou vous n'avez pas le droit de la supprimer.")
+    return {"message": "Historique supprimé avec succès."}

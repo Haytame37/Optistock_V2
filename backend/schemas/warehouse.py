@@ -10,6 +10,7 @@ class WarehouseBase(BaseModel):
     volume_m3: float
     latitude: float
     longitude: float
+    iot_token: Optional[str] = None
 
 
 class WarehouseCreate(WarehouseBase):
@@ -17,7 +18,7 @@ class WarehouseCreate(WarehouseBase):
 
 
 class WarehouseUpdate(WarehouseBase):
-    pass
+    status: Optional[str] = None
 
 
 class WarehouseResponse(WarehouseBase):

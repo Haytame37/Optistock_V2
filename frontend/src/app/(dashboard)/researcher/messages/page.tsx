@@ -6,7 +6,8 @@ import {
   getMessagingRequests, 
   getChatMessages, 
   sendChatMessage, 
-  acceptRentalOffer 
+  acceptRentalOffer,
+  deleteMessagingRequest 
 } from "@/services/messaging.service"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -25,7 +26,8 @@ import {
   TrendingUp,
   History,
   Store,
-  User
+  User,
+  Trash2
 } from "lucide-react"
 import { toast } from "sonner"
 import { useAuth } from "@/providers/auth-provider"
@@ -112,10 +114,23 @@ export default function ResearcherMessagesPage() {
       
       loadRequests()
       if (selectedReqId) loadChat(selectedReqId)
-    } catch (error) {
-      toast.error("Erreur lors de l'acceptation")
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || "Erreur lors de l'acceptation"
+      toast.error(errorMsg)
     } finally {
       setAccepting(false)
+    }
+  }
+
+  const handleDeleteRequest = async (reqId: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cet historique ? Cette action est irréversible.")) return
+    try {
+      await deleteMessagingRequest(reqId)
+      toast.success("Historique supprimé")
+      setSelectedReqId(null)
+      loadRequests()
+    } catch (error) {
+      toast.error("Erreur lors de la suppression")
     }
   }
 
@@ -175,30 +190,40 @@ export default function ResearcherMessagesPage() {
                   getFilteredRequests().map(req => (
                     <button
                       key={req.request_id}
-                      onClick={() => req.status === "accepted" ? setSelectedReqId(req.request_id) : toast.info("Attendez que le propriétaire accepte la discussion")}
+                      onClick={() => setSelectedReqId(req.request_id)}
                       className={cn(
                         "w-full text-left p-4 rounded-xl transition-all border border-transparent",
                         selectedReqId === req.request_id 
                           ? "bg-primary/5 border-primary/20 ring-1 ring-primary/20 shadow-sm" 
                           : "hover:bg-muted/50",
-                        req.status === "accepted" ? "cursor-pointer" : "cursor-default opacity-80"
+                        "cursor-pointer"
                       )}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <p className={cn("font-bold text-sm truncate flex-1 mr-2", selectedReqId === req.request_id ? "text-primary" : "")}>
                           {req.warehouse_name}
                         </p>
-                        <Badge 
-                          variant="outline" 
-                          className={cn(
-                            "text-[10px] px-1.5 py-0",
-                            req.status === "accepted" ? "bg-green-50 text-green-600 border-green-200" :
-                            req.status === "pending" ? "bg-yellow-50 text-yellow-600 border-yellow-200" :
-                            "bg-red-50 text-red-600 border-red-200"
-                          )}
-                        >
-                          {req.status === "accepted" ? "ACTIF" : req.status === "pending" ? "ATTENTE" : "REFUSÉ"}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-[10px] px-1.5 py-0",
+                              req.status === "accepted" ? "bg-green-50 text-green-600 border-green-200" :
+                              req.status === "pending" ? "bg-yellow-50 text-yellow-600 border-yellow-200" :
+                              "bg-red-50 text-red-600 border-red-200"
+                            )}
+                          >
+                            {req.status === "accepted" ? "ACTIF" : req.status === "pending" ? "ATTENTE" : "REFUSÉ"}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-red-500 p-0"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteRequest(req.request_id); }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <User className="h-3 w-3" />
@@ -234,6 +259,14 @@ export default function ResearcherMessagesPage() {
                    <Badge variant="outline" className="text-[10px] text-green-600 border-green-200">
                      Canal de discussion sécurisé
                    </Badge>
+                   <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                    onClick={() => handleDeleteRequest(selectedReqId)}
+                   >
+                     <Trash2 className="h-4 w-4" />
+                   </Button>
                 </div>
               </div>
 
@@ -283,15 +316,16 @@ export default function ResearcherMessagesPage() {
               <div className="p-4 border-t bg-background">
                 <div className="flex gap-2">
                   <Input 
-                    placeholder="Posez vos questions au propriétaire..." 
+                    placeholder={selectedRequest?.status === "pending" ? "En attente d'acceptation du propriétaire..." : "Posez vos questions au propriétaire..."} 
                     className="rounded-full px-4 border-muted-foreground/20 focus-visible:ring-primary"
                     value={newMessage}
                     onChange={e => setNewMessage(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleSendMessage()}
+                    disabled={selectedRequest?.status === "pending"}
                   />
                   <Button 
                     onClick={handleSendMessage} 
-                    disabled={sending || !newMessage.trim()} 
+                    disabled={sending || !newMessage.trim() || selectedRequest?.status === "pending"} 
                     className="rounded-full h-10 w-10 p-0 shrink-0 shadow-md"
                   >
                     <Send className="h-4 w-4" />

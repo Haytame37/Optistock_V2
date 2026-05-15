@@ -35,3 +35,8 @@ export async function deleteWarehouse(id: string) {
   const { data } = await api.delete(`/warehouses/${id}`)
   return data
 }
+
+export async function updateWarehouseStatus(id: string, status: string) {
+  const { data } = await api.patch(`/warehouses/${id}/status?status=${status}`)
+  return data
+}

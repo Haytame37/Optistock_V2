@@ -76,8 +76,9 @@ export default function AddWarehousePage() {
       }
 
       router.push("/owner/warehouses")
-    } catch (error) {
-      toast.error("Erreur lors de la création de l'entrepôt")
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || "Erreur lors de la création de l'entrepôt"
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }

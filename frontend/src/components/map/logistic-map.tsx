@@ -128,8 +128,8 @@ export function LogisticMap({ results, warehouses, clients, lines, weberPoint }:
         <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-blue-500" /> Clients</div>
         {weberPoint && <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-400" /> Centre de Gravité (Weber)</div>}
       </div>
-      <div className="h-[400px] w-full rounded-2xl overflow-hidden border">
-        <MapContainer center={[center.lat, center.lng]} zoom={6} className="h-full w-full" scrollWheelZoom={true}>
+      <div className="h-[400px] w-full rounded-2xl overflow-hidden border relative z-0">
+        <MapContainer center={[center.lat, center.lng]} zoom={6} className="h-full w-full" scrollWheelZoom={true} style={{ zIndex: 0 }}>
           <MapFixer />
           <LayersControl position="topright">
             <BaseLayer checked name="Plan (Clair)">

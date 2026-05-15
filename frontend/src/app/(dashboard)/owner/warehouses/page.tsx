@@ -2,15 +2,23 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { getOwnerWarehouses, deleteWarehouse } from "@/services/warehouse.service"
+import { cn } from "@/lib/utils"
+import { getOwnerWarehouses, deleteWarehouse, updateWarehouseStatus } from "@/services/warehouse.service"
 import { importIoTData } from "@/services/iot.service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { MapPin, Search, Edit2, Trash2, Activity, Upload, Loader2 } from "lucide-react"
+import { MapPin, Search, Edit2, Trash2, Activity, Upload, Loader2, Settings2 } from "lucide-react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +78,16 @@ export default function WarehousesList() {
     }
   }
 
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      await updateWarehouseStatus(id, newStatus)
+      toast.success("Statut mis à jour")
+      setWarehouses(prev => prev.map(wh => wh.id === id ? { ...wh, status: newStatus } : wh))
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour du statut")
+    }
+  }
+
   const filteredWarehouses = warehouses.filter((wh) => {
     const matchesSearch = wh.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           wh.address.toLowerCase().includes(searchQuery.toLowerCase())
@@ -109,16 +127,16 @@ export default function WarehousesList() {
               <Label htmlFor="r1">Tous</Label>
             </div>
             <div className="flex items-center space-x-2 whitespace-nowrap">
-              <RadioGroupItem value="Disponible" id="r2" />
+              <RadioGroupItem value="available" id="r2" />
               <Label htmlFor="r2">Disponible</Label>
             </div>
             <div className="flex items-center space-x-2 whitespace-nowrap">
-              <RadioGroupItem value="Actif" id="r3" />
-              <Label htmlFor="r3">Actif</Label>
+              <RadioGroupItem value="rented" id="r3" />
+              <Label htmlFor="r3">Occupé</Label>
             </div>
             <div className="flex items-center space-x-2 whitespace-nowrap">
-              <RadioGroupItem value="Non disponible" id="r4" />
-              <Label htmlFor="r4">Indisponible</Label>
+              <RadioGroupItem value="maintenance" id="r4" />
+              <Label htmlFor="r4">En Maintenance</Label>
             </div>
           </RadioGroup>
         </div>
@@ -141,14 +159,21 @@ export default function WarehousesList() {
             <Card key={wh.id} className="hover:shadow-md transition-shadow group flex flex-col">
               <CardHeader className="pb-3 flex-none">
                 <div className="flex justify-between items-start mb-2">
-                  <span className={`text-xs font-bold px-2 py-1 rounded-md ${
-                    wh.status === 'Disponible' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                    wh.status === 'Non disponible' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
-                    wh.status === 'Actif' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-                    'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
-                  }`}>
-                    {wh.status?.toUpperCase() || 'INCONNU'}
-                  </span>
+                  <Select defaultValue={wh.status} onValueChange={(val) => handleStatusChange(wh.id, val)}>
+                    <SelectTrigger className={cn(
+                      "h-7 w-auto border-none text-[10px] font-black uppercase tracking-wider px-2",
+                      wh.status === 'available' ? 'bg-green-500 text-white' :
+                      wh.status === 'rented' ? 'bg-blue-600 text-white' :
+                      'bg-amber-500 text-white'
+                    )}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="available">Disponible</SelectItem>
+                      <SelectItem value="rented">Occupé / Actif</SelectItem>
+                      <SelectItem value="maintenance">En Maintenance</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <CardTitle className="text-lg line-clamp-1" title={wh.name}>{wh.name}</CardTitle>
               </CardHeader>

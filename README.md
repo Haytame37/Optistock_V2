@@ -23,7 +23,7 @@ Encadré par : **Pr. Hamza Touil**
 OptiStock Solutions est une plateforme logistique premium conçue pour les acteurs de la Supply Chain. Après une modernisation majeure, l'application est passée d'un prototype Streamlit à une solution **Full-Stack robuste** intégrant des algorithmes de recherche opérationnelle et un monitoring IoT temps réel.
 
 ### Points forts :
-1. **Géolocalisation Prédictive** : Calcul du centre de gravité (Fermat-Weber) et recherche filtrée (HACCP/IoT).
+1. **Géolocalisation Prédictive** : Calcul du centre de gravité (Fermat-Weber) et recherche filtrée (Capteurs/IoT).
 2. **Optimization Lab** : Expansion de réseau via Programmation Linéaire (MIP) et optimisation de tournées (VRP) avec Google OR-Tools.
 3. **Monitoring IoT** : Surveillance thermique temps réel des unités de stockage.
 4. **Interface Industrielle** : Design premium sous Next.js avec mode sombre et animations dynamiques.
