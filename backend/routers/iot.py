@@ -17,6 +17,69 @@ import numpy as np
 router = APIRouter(prefix="/iot", tags=["IoT"])
 
 
+@router.get("/live/{warehouse_id}")
+def get_live_proxy(warehouse_id: str):
+    """
+    Proxy avec AUTO-LOGIN. 
+    Se connecte à ThingsBoard si le token est manquant ou expiré.
+    """
+    DEVICE_ID = "506b1a20-5053-11f1-aa03-0f0d95b4aecc"
+    import requests
+    
+    # 1. Récupération des identifiants et Host
+    host = os.getenv("THINGSBOARD_HOST", "thingsboard.cloud")
+    username = os.getenv("THINGSBOARD_USERNAME", "rafikinajat1@gmail.com")
+    password = os.getenv("THINGSBOARD_PASSWORD")
+    jwt_token = ""
+    
+    # 2. Tentative d'auto-login si mot de passe présent
+    if password:
+        try:
+            login_resp = requests.post(
+                f"https://{host}/api/auth/login",
+                json={"username": username, "password": password},
+                timeout=5
+            )
+            if login_resp.status_code == 200:
+                jwt_token = login_resp.json().get("token")
+        except:
+            pass
+
+    # 3. Appel de la télémétrie (URL avec clés spécifiques)
+    keys = "ZoneA_Temp,ZoneA_Hum,ZoneB_Temp,ZoneB_Hum,ZoneC_Temp,ZoneC_Hum"
+    url = f"https://{host}/api/plugins/telemetry/DEVICE/{DEVICE_ID}/values/timeseries?keys={keys}"
+    headers = {"X-Authorization": f"Bearer {jwt_token}", "Accept": "application/json"}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        raw_text = response.text
+        
+        if response.status_code != 200:
+            return {"error": f"TB Error {response.status_code}", "detail": raw_text[:200]}
+            
+        data = response.json()
+        
+        # On extrait tout pour le dashboard
+        def get_val(key):
+            try: return float(data[key][0]["value"])
+            except: return 0.0
+
+        res = {
+            "temperature": [{"value": get_val("ZoneA_Temp")}],
+            "humidity": [{"value": get_val("ZoneA_Hum")}],
+            "zones": {
+                "A": {"t": get_val("ZoneA_Temp"), "h": get_val("ZoneA_Hum")},
+                "B": {"t": get_val("ZoneB_Temp"), "h": get_val("ZoneB_Hum")},
+                "C": {"t": get_val("ZoneC_Temp"), "h": get_val("ZoneC_Hum")},
+            },
+            "debug_raw": data
+        }
+        return res
+    except Exception as e:
+        return {"error": "Internal Error", "message": str(e)}
+
+
+
 @router.get("/readings/{warehouse_id}", response_model=IoTReadingResponse)
 def get_readings(
     warehouse_id: str,

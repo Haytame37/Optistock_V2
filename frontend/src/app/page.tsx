@@ -125,16 +125,7 @@ export default function LandingPage() {
                     </Button>
                   </Link>
                 </motion.div>
-                <motion.div whileHover={{ scale: 1.05, y: -5 }} whileTap={{ scale: 0.98 }} className="flex-1 sm:flex-none">
-                  <Button 
-                    size="lg" 
-                    variant="outline" 
-                    className="h-14 w-full px-8 text-lg font-black rounded-none bg-white/5 text-white border-white/20 hover:bg-white/10"
-                    onClick={() => scrollToSection('modules')}
-                  >
-                    VOIR LES MODULES
-                  </Button>
-                </motion.div>
+
               </div>
             </div>
           </div>

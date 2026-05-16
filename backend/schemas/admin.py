@@ -6,7 +6,6 @@ class AdminStats(BaseModel):
     total_users: int
     total_warehouses: int
     total_reservations: int
-    system_score: float
     user_distribution: dict # role -> count
     warehouse_distribution: dict # status -> count
     activity_history: List[dict] # {date, count}

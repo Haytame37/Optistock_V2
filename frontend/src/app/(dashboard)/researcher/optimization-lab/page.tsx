@@ -280,18 +280,6 @@ export default function OptimizationLabPage() {
                 </GlassCard>
               </div>
 
-              {/* Solver badges */}
-              <div className="flex gap-2 flex-wrap">
-                <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 font-bold">
-                  🧮 MIP: {results.site_result?.solver ?? "—"}
-                </Badge>
-                <Badge className="bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold">
-                  🚚 VRP: {results.vrp_result?.solver ?? "—"}
-                </Badge>
-                <Badge className="bg-slate-500/10 text-muted-foreground border font-bold">
-                  📍 Distances: Haversine (×1.3)
-                </Badge>
-              </div>
 
               {/* VRP Route */}
               <GlassCard className="p-5">

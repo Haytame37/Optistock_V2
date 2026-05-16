@@ -35,6 +35,7 @@ class AlertRequest(BaseModel):
 
 @router.post("/alert")
 async def trigger_iot_alert(req: AlertRequest, background_tasks: BackgroundTasks):
+    print(f"🚨 [IOT ALERT] Déclenchement pour {req.warehouse_name} | Produit: {req.product_name} | Destinataire: {req.email}")
     # On lance l'envoi en arrière-plan pour ne pas bloquer le dashboard
     background_tasks.add_task(
         send_iot_alert_email, 

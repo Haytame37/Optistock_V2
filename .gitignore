@@ -5,7 +5,6 @@
 **/env/
 
 # Secrets et configuration
-.env
 .env.local
 .env.*.local
 
@@ -16,9 +15,6 @@
 .pytest_cache/
 
 # Base de données locale
-*.db
-*.db-shm
-*.db-wal
 
 # Dossiers d'outils
 .vscode/

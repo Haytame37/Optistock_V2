@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/providers/auth-provider"
 import { Badge } from "@/components/ui/badge"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 // Composant de Jauge Circulaire
 const CircularGauge = ({ value, min, max, label, unit, color, icon: Icon }: any) => {
@@ -73,9 +75,10 @@ export default function IotDashboardPage() {
   const [currentData, setCurrentData] = useState<{ temp: number, hum: number }>({ temp: 0, hum: 0 })
   const [history, setHistory] = useState<any[]>([])
   const [iotToken, setIotToken] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState<number | null>(null)
   
   const liveIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const violationStartTimeRef = useRef<number | null>(null)
+  const violationCounterRef = useRef<number>(0)
   const alertSentRef = useRef<boolean>(false)
 
   useEffect(() => {
@@ -102,7 +105,6 @@ export default function IotDashboardPage() {
     }
   }, [id])
 
-  // Seuils industriels (Synchronisés avec le backend)
   const THRESHOLDS: any = {
     "Tomates": { temp: { min: 7, max: 10 }, hum: { min: 90, max: 95 } },
     "Produits Laitiers": { temp: { min: 2, max: 6 }, hum: { min: 65, max: 80 } },
@@ -110,12 +112,13 @@ export default function IotDashboardPage() {
     "Materiaux de Construction": { temp: { min: -100, max: 200 }, hum: { min: 0, max: 100 } }
   }
 
+
   useEffect(() => {
     if (!iotToken) return;
 
     const fetchLive = async () => {
       try {
-        const tele = await getLiveTelemetry(iotToken);
+        const tele = await getLiveTelemetry(id);
         if (tele && tele.temperature && tele.humidity) {
           const newTemp = tele.temperature[0]?.value;
           const newHum = tele.humidity[0]?.value;
@@ -139,41 +142,50 @@ export default function IotDashboardPage() {
             const isHumCritical = newHum < limits.hum.min || newHum > limits.hum.max;
 
             if (isTempCritical || isHumCritical) {
-              // DÉMARRER LE COMPTEUR DE VIOLATION
-              if (!violationStartTimeRef.current) {
-                violationStartTimeRef.current = Date.now();
+              // INCRÉMENTER LE COMPTEUR DE VIOLATION
+              violationCounterRef.current += 1;
+              const count = violationCounterRef.current;
+              console.log(`[ALERTE] Lecture hors-norme détectée #${count} / 4`);
+
+              // MISE À JOUR DU COMPTE À REBOURS VISUEL (Approximate)
+              const remaining = Math.max(0, 4 - count) * 3;
+              setCountdown(count < 4 && !alertSentRef.current ? remaining : null);
+
+              if (count % 2 === 0) {
+                toast.error(`ALERTE CRITIQUE : Seuil dépassé (${count}/4)`, {
+                  description: `Temp: ${newTemp}°C | Hum: ${newHum}%`,
+                  duration: 1500,
+                });
               }
 
-              const violationDuration = (Date.now() - violationStartTimeRef.current) / 1000;
-
-              toast.error(`ALERTE CRITIQUE : Dépassement des seuils (${Math.round(violationDuration)}s)`, {
-                description: `Temp: ${newTemp}°C | Hum: ${newHum}%`,
-                duration: 2000,
-              });
-
-              // SI DÉPASSEMENT > 30 SECONDES ET EMAIL NON ENVOYÉ
-              if (violationDuration >= 30 && !alertSentRef.current) {
+              // DÉCLENCHEMENT SI 4 LECTURES CONSÉCUTIVES (Environ 12s)
+              if (count >= 4 && !alertSentRef.current) {
                 alertSentRef.current = true;
-                fetch("http://localhost:8000/warehouses/alert", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    email: user?.email || "najat.pfa@gmail.com",
-                    warehouse_name: `Entrepôt ${id}`,
-                    product_name: product,
-                    temp: newTemp,
-                    hum: newHum
-                  })
+                setCountdown(null);
+                console.log("🚨 DÉCLENCHEMENT AUTOMATIQUE DE L'ALERTE EMAIL");
+                
+                api.post("/warehouses/alert", {
+                  email: user?.email || "najat.pfa@gmail.com",
+                  warehouse_name: `Entrepôt ${id}`,
+                  product_name: product,
+                  temp: newTemp,
+                  hum: newHum
                 }).then(() => {
                   toast.success("🚨 ALERTE EMAIL ENVOYÉE !", {
-                    description: "Le seuil de tolérance temporel a été dépassé. Email envoyé au chercheur.",
+                    description: `Conditions hors-normes persistantes. Email envoyé à ${user?.email || "najat.pfa@gmail.com"}`,
                   });
-                }).catch(err => console.error("Email error", err));
+                }).catch(err => {
+                  console.error("Erreur API Alerte Auto:", err);
+                });
               }
             } else {
               // RÉINITIALISER SI RETOUR À LA NORMALE
-              violationStartTimeRef.current = null;
+              if (violationCounterRef.current > 0) {
+                console.log("[IOT] Retour aux conditions normales.");
+              }
+              violationCounterRef.current = 0;
               alertSentRef.current = false;
+              setCountdown(null);
             }
           }
         }
@@ -227,6 +239,11 @@ export default function IotDashboardPage() {
             <div>
               <p className="font-black text-lg uppercase tracking-wider">Alerte : Conditions Hors Normes !</p>
               <p className="text-sm opacity-90 font-medium">Les paramètres de stockage ne respectent plus les contraintes pour : {product}</p>
+              {countdown !== null && (
+                <p className="text-xs font-bold mt-1 bg-white/20 inline-block px-2 py-0.5 rounded border border-white/30">
+                  📧 Envoi d'un e-mail d'alerte dans {countdown}s...
+                </p>
+              )}
             </div>
           </div>
           <Badge variant="outline" className="bg-white text-red-600 font-bold border-none px-4 py-1">CRITIQUE</Badge>

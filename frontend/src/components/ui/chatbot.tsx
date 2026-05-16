@@ -27,12 +27,20 @@ export function ChatbotWidget() {
       newContext = 'admin';
     }
 
-    // If context changed, reset the chat!
+    // If context changed OR user changed (login/logout), reset the chat!
     if (newContext !== currentContext) {
       setCurrentContext(newContext);
       setMessages([]); 
     }
   }, [pathname, user, currentContext]);
+
+  // 1b. Force reset and close on logout
+  useEffect(() => {
+    if (!user) {
+      setMessages([]);
+      setIsOpen(false);
+    }
+  }, [user]);
 
   // 2. Set initial welcome message based on the active context
   useEffect(() => {

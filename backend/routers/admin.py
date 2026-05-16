@@ -47,7 +47,6 @@ def get_admin_stats(current_user: dict = Depends(get_current_user)):
         total_users=total_users,
         total_warehouses=total_wh,
         total_reservations=total_res,
-        system_score=98.5,
         user_distribution=user_dist,
         warehouse_distribution=wh_dist,
         activity_history=activity_history,

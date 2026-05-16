@@ -153,7 +153,7 @@ export default function AdminDashboard() {
 
         <TabsContent value="overview" className="space-y-6">
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <GlassCard className="p-5 border-l-4 border-l-blue-600">
               <div className="flex justify-between items-start">
                 <div>
@@ -193,19 +193,8 @@ export default function AdminDashboard() {
               </div>
             </GlassCard>
 
-            <GlassCard className="p-5 border-l-4 border-l-red-600">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Score Système</p>
-                  <p className="text-3xl font-extrabold mt-1">{stats?.system_score ?? 0}%</p>
-                </div>
-                <ShieldAlert className="h-8 w-8 text-red-600/20" />
-              </div>
-              <div className="flex items-center mt-4 text-xs text-green-600 font-medium">
-                <TrendingUp className="h-3 w-3 mr-1" /> Optimisé
-              </div>
-            </GlassCard>
           </div>
+
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <GlassCard className="lg:col-span-2 p-6">
@@ -449,19 +438,7 @@ export default function AdminDashboard() {
             </GlassCard>
           </div>
 
-          <GlassCard className="p-6 border-l-4 border-l-red-600">
-            <div className="flex items-start gap-4">
-              <AlertCircle className="h-6 w-6 text-red-600 mt-1" />
-              <div>
-                <h3 className="font-bold text-lg text-red-700">Zone de Danger</h3>
-                <p className="text-sm text-muted-foreground mb-4">Actions irréversibles sur la structure globale du système.</p>
-                <div className="flex gap-4">
-                  <Button variant="destructive" disabled>Réinitialiser la Base de Données</Button>
-                  <Button variant="outline" disabled>Exporter Logs Critiques</Button>
-                </div>
-              </div>
-            </div>
-          </GlassCard>
+
         </TabsContent>
       </Tabs>
 

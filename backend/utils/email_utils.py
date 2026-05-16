@@ -62,34 +62,28 @@ def send_iot_alert_email(to_email, warehouse_name, product_name, temp, hum):
     sender_password = os.getenv("SENDER_PASSWORD")
 
     if not sender_email or not sender_password:
-        print(f"[SIMULATION ALERTE IOT] Vers: {to_email} | Warehouse: {warehouse_name} | Produit: {product_name} | T: {temp}°C | H: {hum}%")
+        print(f"[SIMULATION] Email Alert: {to_email}")
         return False
 
-    msg = MIMEMultipart()
-    msg['From'] = f"OptiStock IoT Sentinel <{sender_email}>"
-    msg['To'] = to_email
-    msg['Subject'] = f"🚨 ALERTE CRITIQUE : Dépassement de seuils - {warehouse_name}"
-
+    subject = f"ALERTE CRITIQUE : Seuil depasse - {warehouse_name}"
     body = f"""
-    ALERTE CRITIQUE DE SÉCURITÉ ALIMENTAIRE / INDUSTRIELLE
+    ALERTE CRITIQUE DE SECURITE
     
-    Bonjour,
+    L'entrepôt '{warehouse_name}' a depasse les seuils pour le produit : {product_name}.
     
-    Notre système de surveillance IoT a détecté un dépassement prolongé des seuils de conservation dans votre entrepôt :
+    DETAILS :
+    - Temperature : {temp} C
+    - Humidite : {hum} %
     
-    --------------------------------------------------
-    ENTREPÔT : {warehouse_name}
-    PRODUIT STOCKÉ : {product_name}
-    --------------------------------------------------
-    TEMPÉRATURE ACTUELLE : {temp}°C
-    HUMIDITÉ ACTUELLE : {hum}%
-    --------------------------------------------------
+    Action immediate requise.
     
-    ATTENTION : La qualité de votre marchandise est compromise. Veuillez intervenir immédiatement pour vérifier les installations frigorifiques ou de ventilation.
-    
-    Ceci est une alerte automatique générée par OptiStock Solutions.
+    OptiStock IoT Sentinel.
     """
-    msg.attach(MIMEText(body, 'plain'))
+    
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = f"OptiStock IoT <{sender_email}>"
+    msg['To'] = to_email
 
     try:
         server = smtplib.SMTP(smtp_server, smtp_port)
@@ -97,10 +91,10 @@ def send_iot_alert_email(to_email, warehouse_name, product_name, temp, hum):
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, to_email, msg.as_string())
         server.quit()
-        print(f"✅ Email d'alerte IoT envoyé à {to_email}")
+        print(f"✅ Email d'alerte IoT envoyé avec succès à {to_email}")
         return True
     except Exception as e:
-        print(f"❌ Échec envoi alerte email : {e}")
+        print(f"❌ ERREUR SMTP ALERTE : {str(e)}")
         return False
 
 def send_offer_received_email(to_email, owner_name, warehouse_name):
