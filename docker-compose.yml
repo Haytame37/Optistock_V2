@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+
+  # ── FastAPI Backend ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env          # loads all secrets — nothing is hardcoded here
+    volumes:
+      - sqlite_data:/app/database   # named volume persists optistock.db across restarts
+    networks:
+      - optistock_net
+    restart: unless-stopped
+
+  # ── Next.js Frontend ────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - optistock_net
+    restart: unless-stopped
+
+# ── Named volume (SQLite persistence) ────────────────────────────────────────
+volumes:
+  sqlite_data:
+
+# ── Explicit bridge network ───────────────────────────────────────────────────
+networks:
+  optistock_net:
+    driver: bridge

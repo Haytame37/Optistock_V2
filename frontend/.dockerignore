@@ -1,0 +1,17 @@
+# frontend/.dockerignore — build context is ./frontend
+
+# Installed packages (reinstalled inside image via npm ci)
+node_modules/
+
+# Previous build output (rebuilt inside image)
+.next/
+
+# Local environment overrides (API URL is injected via build arg instead)
+.env.local
+
+# Local dev helpers
+run.bat
+
+# OS artifacts
+.DS_Store
+Thumbs.db

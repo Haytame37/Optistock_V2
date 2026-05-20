@@ -1,0 +1,29 @@
+# backend/.dockerignore — build context is ./backend
+
+# Python cache & compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pycache
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Dev/test scripts (not part of the app)
+scratch/
+scripts/
+
+# Local dev helpers
+run.bat
+run.sh
+token.txt
+
+# Node artifact (backend has a stray package-lock.json)
+package-lock.json
+
+# NOTE: database/optistock.db is intentionally NOT excluded.
+# Docker copies it into the image layer so the named volume is
+# initialized with seeded data on first run.

@@ -43,7 +43,7 @@ export function WeberCalculator() {
           <Input type="number" placeholder="Latitude" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: Number(e.target.value) })} />
           <Input type="number" placeholder="Longitude" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: Number(e.target.value) })} />
         </div>
-        <Button onClick={() => { if (form.name) { setClients([...clients, form]); setForm({ name: "", latitude: 33.5731, longitude: -7.5898 }) } }}>
+        <Button onClick={() => { if (form.name) { setClients([...clients, { ...form, demand: 1 }]); setForm({ name: "", latitude: 33.5731, longitude: -7.5898 }) } }}>
           <Plus className="h-4 w-4 mr-2" /> Ajouter
         </Button>
 

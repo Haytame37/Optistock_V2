@@ -23,19 +23,26 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-const researcherLinks = [
+interface SidebarLink {
+  href: string
+  label: string
+  icon: any
+  exact?: boolean
+}
+
+const researcherLinks: SidebarLink[] = [
   { href: "/researcher", label: "Accueil", icon: Home, exact: true },
   { href: "/researcher/search", label: "Module 1 : Recherche d'entrepôt", icon: Search },
   { href: "/researcher/optimization-lab", label: "Module 2 : Optimization Lab", icon: Zap },
 ]
 
-const ownerLinks = [
+const ownerLinks: SidebarLink[] = [
   { href: "/owner", label: "Accueil", icon: Home },
   { href: "/owner/warehouses", label: "Entrepôts", icon: Warehouse },
   { href: "/owner/messages", label: "Messagerie", icon: MessageSquare },
 ]
 
-const adminLinks = [
+const adminLinks: SidebarLink[] = [
   { href: "/admin", label: "Dashboard", icon: Home },
   { href: "/admin", label: "Utilisateurs", icon: Search },
   { href: "/admin", label: "Maintenance", icon: RefreshCcw },

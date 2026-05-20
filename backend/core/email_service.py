@@ -6,10 +6,10 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com").strip()
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL").strip() if os.getenv("SENDER_EMAIL") else None
+SENDER_PASSWORD = os.getenv("SENDER_PASSWORD").strip() if os.getenv("SENDER_PASSWORD") else None
 
 def send_email(to_email: str, subject: str, html_content: str):
     if not SENDER_EMAIL or not SENDER_PASSWORD:

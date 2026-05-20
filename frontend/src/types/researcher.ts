@@ -21,6 +21,8 @@ export interface SearchRequest {
   warehouses: MyWarehouse[]
   clients: ClientPoint[]
   quick_search: boolean
+  cost_weight?: number
+  dist_weight?: number
 }
 
 export interface SearchResultItem {
@@ -38,6 +40,7 @@ export interface SearchResultItem {
 }
 
 export interface SearchResponse {
+  id?: number
   results: SearchResultItem[]
   product: string
   volume: number
