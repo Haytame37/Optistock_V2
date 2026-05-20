@@ -57,7 +57,14 @@ export default function SignupPage() {
       toast.success("Compte créé avec succès")
       router.push("/login")
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Erreur lors de l'inscription")
+      const detail = err.response?.data?.detail
+      if (Array.isArray(detail)) {
+        toast.error(detail.map((d: any) => d.msg).join(", "))
+      } else if (typeof detail === "string") {
+        toast.error(detail)
+      } else {
+        toast.error("Erreur lors de l'inscription")
+      }
     } finally {
       setLoading(false)
     }

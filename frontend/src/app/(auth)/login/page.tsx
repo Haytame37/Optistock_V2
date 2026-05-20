@@ -45,7 +45,14 @@ export default function LoginPage() {
         router.push("/researcher")
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Identifiants incorrects")
+      const detail = err.response?.data?.detail
+      if (Array.isArray(detail)) {
+        toast.error(detail.map((d: any) => d.msg).join(", "))
+      } else if (typeof detail === "string") {
+        toast.error(detail)
+      } else {
+        toast.error("Identifiants incorrects")
+      }
     } finally {
       setLoading(false)
     }
@@ -100,7 +107,7 @@ export default function LoginPage() {
               </div>
             </div>
             <div className="flex justify-end">
-              <Link href="/forgot-password" size="sm" className="text-xs text-primary hover:underline">
+              <Link href="/forgot-password" className="text-xs text-primary hover:underline">
                 Mot de passe oublié ?
               </Link>
             </div>

@@ -1,0 +1,22 @@
+# Root-level .dockerignore — applied when Docker resolves relative paths
+# from project root (not directly used by per-service builds, but good practice)
+
+# Version control
+.git
+.gitignore
+
+# Python virtual environments
+venv/
+
+# Documentation & reports (not needed in any image)
+docs/
+*.md
+*.docx
+*.pdf
+*.csv
+
+# IDE & OS artifacts
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
