@@ -2,12 +2,15 @@ import sqlite3
 import bcrypt
 import os
 from utils.db import get_db_connection
+
+# En dev, on utilise 4 rounds pour la rapidité (prod = 12)
+BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS", "4"))
 from utils.helpers import get_current_time
 
 def hash_password(password):
     """Hache un mot de passe en utilisant bcrypt avec un sel généré automatiquement."""
     # bcrypt.hashpw attend des bytes, on encode donc la chaîne
-    salt = bcrypt.gensalt()
+    salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed.decode('utf-8')
 

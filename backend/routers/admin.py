@@ -171,11 +171,15 @@ def delete_user(user_id: int, current_user: dict = Depends(get_current_user)):
     if user_id == int(current_user["user_id"]):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Action impossible sur soi-même")
         
+    # Dissocier les entrepôts appartenant à cet utilisateur en mettant l'owner_id à NULL
+    # pour éviter les violations de clés étrangères dans SQLite.
+    execute_query("UPDATE warehouses SET owner_id = NULL WHERE owner_id = ?", (user_id,))
+        
     success = execute_query("DELETE FROM users WHERE user_id = ?", (user_id,))
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Impossible de supprimer cet utilisateur car il possède des entrepôts, des réservations ou des messages associés. Veuillez plutôt suspendre/désactiver son compte."
+            detail="Impossible de supprimer cet utilisateur. Veuillez plutôt suspendre/désactiver son compte."
         )
     return {"success": True}
 

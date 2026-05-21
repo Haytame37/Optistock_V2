@@ -102,8 +102,9 @@ export default function AdminDashboard() {
       await deleteUser(userId)
       toast.success("Utilisateur supprimé")
       loadData()
-    } catch {
-      toast.error("Erreur lors de la suppression")
+    } catch (error: any) {
+      const errMsg = error?.response?.data?.detail || "Erreur lors de la suppression"
+      toast.error(errMsg)
     }
   }
 
