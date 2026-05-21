@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { 
   getMessagingRequests, 
   respondToRequest, 
@@ -30,13 +31,15 @@ import {
   PlusCircle,
   TrendingUp,
   History,
-  Trash2
+  Trash2,
+  ArrowLeft
 } from "lucide-react"
 import { toast } from "sonner"
 import { useAuth } from "@/providers/auth-provider"
 import { cn } from "@/lib/utils"
 
 export default function OwnerMessagesPage() {
+  const router = useRouter()
   const { user } = useAuth()
   const [requests, setRequests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -167,6 +170,16 @@ export default function OwnerMessagesPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="mb-2">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="gap-2 text-muted-foreground hover:text-foreground pl-0" 
+          onClick={() => router.push("/owner")}
+        >
+          <ArrowLeft className="h-4 w-4" /> Retour au tableau de bord
+        </Button>
+      </div>
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
@@ -205,7 +218,7 @@ export default function OwnerMessagesPage() {
               </div>
               <h3 className="text-lg font-medium">Aucune nouvelle demande</h3>
               <p className="text-muted-foreground max-w-xs mx-auto mt-2 text-sm">
-                Les demandes des chercheurs apparaîtront ici dès qu'ils vous contacteront.
+                Les demandes des clients logistiques apparaîtront ici dès qu'ils vous contacteront.
               </p>
             </Card>
           ) : (
@@ -230,7 +243,7 @@ export default function OwnerMessagesPage() {
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-primary" />
                           <div>
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground/50">Chercheur</p>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground/50">Client Logistique</p>
                             <p className="font-semibold">{req.researcher_first_name}</p>
                           </div>
                         </div>
@@ -454,7 +467,7 @@ export default function OwnerMessagesPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-foreground/70">Sélectionnez une discussion</h3>
                 <p className="text-sm max-w-xs text-center mt-2">
-                  Choisissez un chercheur dans la liste de gauche pour négocier les conditions de location.
+                  Choisissez un client logistique dans la liste de gauche pour négocier les conditions de location.
                 </p>
               </div>
             )}
@@ -476,7 +489,7 @@ export default function OwnerMessagesPage() {
                   <thead>
                     <tr className="bg-muted/50 text-muted-foreground font-medium text-left">
                       <th className="p-4">Entrepôt</th>
-                      <th className="p-4">Chercheur</th>
+                      <th className="p-4">Client Logistique</th>
                       <th className="p-4">Produit</th>
                       <th className="p-4">Statut</th>
                       <th className="p-4">Date</th>

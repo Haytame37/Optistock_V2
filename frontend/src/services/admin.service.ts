@@ -42,3 +42,9 @@ export async function updateWarehouseToken(warehouseId: string, token: string) {
   const { data } = await api.patch(`/admin/warehouses/${warehouseId}/iot-token`, { token })
   return data
 }
+
+export async function createUser(userData: any) {
+  const { data } = await api.post("/admin/users", userData)
+  return data
+}
+

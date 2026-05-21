@@ -12,7 +12,7 @@ services:
     env_file:
       - ./backend/.env          # loads all secrets — nothing is hardcoded here
     volumes:
-      - sqlite_data:/app/database   # named volume persists optistock.db across restarts
+      - ./backend/database:/app/database   # bind mount syncs local database in real-time
     networks:
       - optistock_net
     restart: unless-stopped
@@ -32,9 +32,7 @@ services:
       - optistock_net
     restart: unless-stopped
 
-# ── Named volume (SQLite persistence) ────────────────────────────────────────
-volumes:
-  sqlite_data:
+
 
 # ── Explicit bridge network ───────────────────────────────────────────────────
 networks:

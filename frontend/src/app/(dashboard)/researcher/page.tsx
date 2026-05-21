@@ -42,7 +42,7 @@ export default function ResearcherPage() {
   return (
     <div className="space-y-6">
       <GradientHero
-        title={`Bonjour ${user?.first_name || "Chercheur"}`}
+        title={`Bonjour ${user?.first_name || "Client Logistique"}`}
         subtitle="Cette interface vous permet de lancer une recherche d'entrepôt, consulter les résultats de vos analyses et suivre les retours des propriétaires."
       />
 

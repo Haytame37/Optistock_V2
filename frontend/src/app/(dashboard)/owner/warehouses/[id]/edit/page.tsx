@@ -168,7 +168,7 @@ export default function EditWarehousePage() {
                     </SelectContent>
                   </Select>
                   <p className="text-[10px] text-muted-foreground mt-2 italic">
-                    Note: Un entrepôt en maintenance n'est pas visible par les chercheurs.
+                    Note: Un entrepôt en maintenance n'est pas visible par les clients logistiques.
                   </p>
                 </div>
               </CardContent>

@@ -95,7 +95,7 @@ export default function SignupPage() {
               <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
                 <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="researcher">Chercheur d'entrepôt</SelectItem>
+                  <SelectItem value="researcher">Client Logistique</SelectItem>
                   <SelectItem value="owner">Propriétaire d'entrepôt</SelectItem>
                 </SelectContent>
               </Select>

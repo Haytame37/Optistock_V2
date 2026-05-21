@@ -150,7 +150,7 @@ export function Sidebar({
         <div className={cn("mb-2 rounded-xl bg-muted/50 p-3 transition-all", collapsed ? "hidden" : "block")}>
           <p className="text-[10px] font-bold uppercase text-muted-foreground/40 mb-1">Session</p>
           <p className="text-xs font-semibold truncate text-primary">{user?.first_name} {user?.last_name}</p>
-          <p className="text-[10px] capitalize text-muted-foreground/60">{user?.role}</p>
+          <p className="text-[10px] capitalize text-muted-foreground/60">{user?.role === "researcher" ? "Client Logistique" : user?.role}</p>
         </div>
 
         <Button 

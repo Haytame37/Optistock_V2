@@ -2,8 +2,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from dependencies.auth import get_current_user
-from schemas.admin import AdminStats, UserSummary, UserProfileDetails, MaintenanceReport
+from schemas.admin import AdminStats, UserSummary, UserProfileDetails, MaintenanceReport, UserCreateRequest
 from utils.db import load_sql_to_dataframe, execute_query, get_db_connection
+from core.auth import create_user
 from core.maintenance import process_inactive_users
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -79,6 +80,27 @@ def list_users(role: Optional[str] = None, q: Optional[str] = None, current_user
     df = load_sql_to_dataframe(query, tuple(params))
     return df.to_dict(orient="records")
 
+@router.post("/users")
+def admin_create_user(req: UserCreateRequest, current_user: dict = Depends(get_current_user)):
+    check_admin(current_user)
+    
+    # Validate role value
+    if req.role not in ["admin", "owner", "researcher"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rôle invalide. Choisissez entre admin, owner, ou researcher.")
+        
+    # Create user in database
+    ok, err = create_user(
+        role=req.role,
+        first_name=req.first_name,
+        last_name=req.last_name,
+        email=req.email,
+        password=req.password
+    )
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err)
+        
+    return {"message": "Compte créé avec succès", "email": req.email}
+
 @router.get("/users/{user_id}", response_model=UserProfileDetails)
 def get_user_profile(user_id: int, current_user: dict = Depends(get_current_user)):
     check_admin(current_user)
@@ -147,9 +169,14 @@ def toggle_user_status(user_id: int, current_user: dict = Depends(get_current_us
 def delete_user(user_id: int, current_user: dict = Depends(get_current_user)):
     check_admin(current_user)
     if user_id == int(current_user["user_id"]):
-        raise HTTPException(status_code=400, detail="Action impossible sur soi-même")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Action impossible sur soi-même")
         
-    execute_query("DELETE FROM users WHERE user_id = ?", (user_id,))
+    success = execute_query("DELETE FROM users WHERE user_id = ?", (user_id,))
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Impossible de supprimer cet utilisateur car il possède des entrepôts, des réservations ou des messages associés. Veuillez plutôt suspendre/désactiver son compte."
+        )
     return {"success": True}
 
 @router.post("/maintenance/cleanup", response_model=MaintenanceReport)

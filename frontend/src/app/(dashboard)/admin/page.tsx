@@ -19,7 +19,9 @@ import {
   ArrowUpRight,
   TrendingUp,
   Settings,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft,
+  X
 } from "lucide-react"
 import {
   LineChart,
@@ -43,7 +45,8 @@ import {
   runCleanup, 
   purgeLocks,
   getUserProfile,
-  updateWarehouseToken
+  updateWarehouseToken,
+  createUser
 } from "@/services/admin.service"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -59,6 +62,14 @@ export default function AdminDashboard() {
   
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [inspecting, setInspecting] = useState(false)
+  const [creatingUser, setCreatingUser] = useState(false)
+  const [newUserData, setNewUserData] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    password: "",
+    role: "researcher"
+  })
 
   const loadData = async () => {
     setLoading(true)
@@ -127,13 +138,33 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleCreateUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await createUser(newUserData)
+      toast.success("Compte créé avec succès !")
+      setCreatingUser(false)
+      setNewUserData({
+        first_name: "",
+        last_name: "",
+        email: "",
+        password: "",
+        role: "researcher"
+      })
+      loadData()
+    } catch (error: any) {
+      const errMsg = error?.response?.data?.detail || "Erreur lors de la création du compte"
+      toast.error(errMsg)
+    }
+  }
+
   if (loading && !stats) return <div className="p-12 text-center">Chargement du panel admin...</div>
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Shield Admin Panel</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard Admin</h1>
           <p className="text-muted-foreground mt-1">Contrôle centralisé de la plateforme OptiStock.</p>
         </div>
         <div className="flex gap-2">
@@ -264,9 +295,16 @@ export default function AdminDashboard() {
                     className="capitalize"
                     onClick={() => setRoleFilter(role)}
                   >
-                    {role}
+                    {role === "researcher" ? "Client Logistique" : role}
                   </Button>
                 ))}
+                <Button 
+                  size="sm" 
+                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => setCreatingUser(true)}
+                >
+                  <UserPlus className="h-4 w-4" /> Créer un compte
+                </Button>
               </div>
             </div>
 
@@ -302,7 +340,7 @@ export default function AdminDashboard() {
                           u.role === 'owner' ? "border-blue-200 text-blue-700 bg-blue-50" :
                           "border-green-200 text-green-700 bg-green-50"
                         )}>
-                          {u.role}
+                          {u.role === "researcher" ? "Client Logistique" : u.role}
                         </Badge>
                       </td>
                       <td className="py-4">
@@ -446,14 +484,23 @@ export default function AdminDashboard() {
       {inspecting && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-end">
           <div className="w-full max-w-2xl bg-background shadow-2xl p-8 overflow-y-auto animate-in slide-in-from-right duration-300">
+            <div className="mb-6">
+              <Button 
+                variant="ghost" 
+                className="gap-2 text-muted-foreground hover:text-foreground pl-0"
+                onClick={() => setInspecting(false)}
+              >
+                <ArrowLeft className="h-4 w-4" /> Retour à la liste
+              </Button>
+            </div>
             <div className="flex justify-between items-start mb-8">
               <div>
-                <Badge className="mb-2 uppercase">{selectedUser.role}</Badge>
+                <Badge className="mb-2 uppercase">{selectedUser.role === "researcher" ? "Client Logistique" : selectedUser.role}</Badge>
                 <h2 className="text-3xl font-bold">{selectedUser.first_name} {selectedUser.last_name}</h2>
                 <p className="text-muted-foreground">{selectedUser.email}</p>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setInspecting(false)}>
-                <Trash2 className="h-6 w-6 rotate-45" />
+                <X className="h-5 w-5" />
               </Button>
             </div>
 
@@ -531,6 +578,102 @@ export default function AdminDashboard() {
               >
                 Supprimer Définitivement
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal/Slide-over */}
+      {creatingUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-end">
+          <div className="w-full max-w-md bg-background shadow-2xl p-8 overflow-y-auto animate-in slide-in-from-right duration-300 flex flex-col h-full justify-between">
+            <div>
+              <div className="mb-6">
+                <Button 
+                  variant="ghost" 
+                  className="gap-2 text-muted-foreground hover:text-foreground pl-0"
+                  onClick={() => setCreatingUser(false)}
+                >
+                  <ArrowLeft className="h-4 w-4" /> Retour à la liste
+                </Button>
+              </div>
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold">Créer un nouveau compte</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Ajouter un client logistique, un propriétaire ou un admin.</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setCreatingUser(false)}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              <form onSubmit={handleCreateUserSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase">Prénom</label>
+                    <Input 
+                      placeholder="Jean" 
+                      required 
+                      value={newUserData.first_name} 
+                      onChange={e => setNewUserData({...newUserData, first_name: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase">Nom</label>
+                    <Input 
+                      placeholder="Dupont" 
+                      required 
+                      value={newUserData.last_name} 
+                      onChange={e => setNewUserData({...newUserData, last_name: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">Adresse email</label>
+                  <Input 
+                    type="email" 
+                    placeholder="jean.dupont@example.com" 
+                    required 
+                    value={newUserData.email} 
+                    onChange={e => setNewUserData({...newUserData, email: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">Mot de passe</label>
+                  <Input 
+                    type="password" 
+                    placeholder="••••••••" 
+                    required 
+                    minLength={6} 
+                    value={newUserData.password} 
+                    onChange={e => setNewUserData({...newUserData, password: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase">Rôle</label>
+                  <select 
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={newUserData.role}
+                    onChange={e => setNewUserData({...newUserData, role: e.target.value})}
+                  >
+                    <option value="researcher">Client Logistique</option>
+                    <option value="owner">Propriétaire</option>
+                    <option value="admin">Administrateur</option>
+                  </select>
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setCreatingUser(false)}>
+                    Annuler
+                  </Button>
+                  <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+                    Créer le compte
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

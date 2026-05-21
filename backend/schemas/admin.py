@@ -38,3 +38,11 @@ class MaintenanceReport(BaseModel):
     count: int
     details: List[str]
     success: bool
+
+class UserCreateRequest(BaseModel):
+    role: str
+    first_name: str
+    last_name: str
+    email: str
+    password: str
+

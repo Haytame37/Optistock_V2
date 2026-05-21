@@ -50,7 +50,7 @@ export function ChatbotWidget() {
       if (currentContext === 'owner') {
         welcomeMsg = "🏭 Bonjour Propriétaire ! Je suis là pour vous aider à gérer vos entrepôts et vos locations sur ce tableau de bord.";
       } else if (currentContext === 'researcher') {
-        welcomeMsg = "🔬 Bonjour Chercheur ! Besoin d'aide pour trouver l'entrepôt idéal ou calculer un score d'optimisation ici ?";
+        welcomeMsg = "🔬 Bonjour Client Logistique ! Besoin d'aide pour trouver l'entrepôt idéal ou calculer un score d'optimisation ici ?";
       } else if (currentContext === 'admin') {
         welcomeMsg = "⚙️ Bonjour Admin ! Prêt à superviser la plateforme OptiStock ?";
       }
